@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Fujup Ventures — Inventory</title>
+<title>Fujup Venture</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -369,23 +369,54 @@ tbody tr:hover{background:var(--bg)}
 <div class="loading-screen" id="loading">
   <div style="font-size:2rem">📦</div>
   <div class="spin"></div>
-  <p>Loading Fujup Ventures…</p>
+  <p>Connecting to Fujup Venture…</p>
 </div>
 
-<!-- ══ LOGIN SCREEN ══ -->
-<div class="screen screen-bg" id="lock-screen">
+<!-- ══ SUPER ADMIN PIN ══ -->
+<div class="screen screen-sa h" id="sa-screen">
   <div class="lcard">
-    <div class="llogo"><div class="llogo-icon">📦</div><div class="llogo-text">Fujup<span> Ventures</span></div></div>
-    <!-- Tabs -->
-    <div class="ltabs">
-      <div class="ltab on" id="t-pin" onclick="switchTab('pin')">🔑 Admin PIN</div>
-      <div class="ltab" id="t-login" onclick="switchTab('login')">👤 Staff Login</div>
+    <div style="text-align:center;margin-bottom:18px">
+      <div class="llogo-icon" style="margin:0 auto 10px;width:54px;height:54px;font-size:1.5rem">🛡️</div>
+      <div class="sa-badge">Super Admin</div>
+      <div class="ltitle" style="margin-top:6px">Fujup Venture Control</div>
+      <div class="lsub">Enter Super Admin PIN</div>
     </div>
+    <div class="pin-dots"><div class="pd" id="sd0"></div><div class="pd" id="sd1"></div><div class="pd" id="sd2"></div><div class="pd" id="sd3"></div></div>
+    <div id="sa-pin-err" class="errbox h">❌ Wrong PIN. Try again.</div>
+    <div class="numpad">
+      <button class="nk" onclick="sPk('1')">1</button><button class="nk" onclick="sPk('2')">2</button><button class="nk" onclick="sPk('3')">3</button>
+      <button class="nk" onclick="sPk('4')">4</button><button class="nk" onclick="sPk('5')">5</button><button class="nk" onclick="sPk('6')">6</button>
+      <button class="nk" onclick="sPk('7')">7</button><button class="nk" onclick="sPk('8')">8</button><button class="nk" onclick="sPk('9')">9</button>
+      <button class="nk" style="grid-column:span 2" onclick="sPk('0')">0</button>
+      <button class="nk" onclick="sPdel()">⌫</button>
+    </div>
+    <button class="btn-ghost" onclick="show('lock-screen')">👤 Staff / Buyer Login</button>
+    <div class="lfoot"><span class="pdot"></span>Firebase Sync · Secured</div>
+  </div>
+</div>
 
-    <!-- ── Admin PIN panel ── -->
-    <div id="f-pin">
-      <div class="ltitle">Admin Access</div>
-      <div class="lsub">Enter your 4-digit PIN to continue</div>
+<!-- ══ STAFF / BUYER LOGIN ══ -->
+<div class="screen screen-bg h" id="lock-screen">
+  <div class="lcard">
+    <div class="llogo"><div class="llogo-icon">📦</div><div class="llogo-text">Fujup<span> Venture</span></div></div>
+    <div class="ltabs">
+      <div class="ltab on" id="t-login" onclick="switchTab('login')">Staff Login</div>
+      <div class="ltab" id="t-pin" onclick="switchTab('pin')">Admin PIN</div>
+    </div>
+    <!-- Email login -->
+    <div id="f-login">
+      <div class="ltitle">Welcome back</div>
+      <div class="lsub">Sign in with your staff credentials</div>
+      <div id="login-err" class="errbox h"></div>
+      <div class="fg"><label class="fl">Email</label><input class="fi" type="email" id="l-email" placeholder="staff@business.com"/></div>
+      <div class="fg"><label class="fl">Password</label><div class="pw-w"><input class="fi" type="password" id="l-pass" placeholder="Password"/><span class="pw-eye" onclick="tpw('l-pass')">👁</span></div></div>
+      <button class="btn-pri" id="login-btn" onclick="doLogin()">Sign In →</button>
+      <button class="btn-ghost" onclick="switchTab('pin')">🔑 Use Buyer Admin PIN</button>
+    </div>
+    <!-- PIN -->
+    <div id="f-pin" class="h">
+      <div class="ltitle">Buyer Admin PIN</div>
+      <div class="lsub">Enter your buyer's 4-digit PIN</div>
       <div class="pin-dots"><div class="pd" id="d0"></div><div class="pd" id="d1"></div><div class="pd" id="d2"></div><div class="pd" id="d3"></div></div>
       <div id="pin-err" class="errbox h">❌ Wrong PIN. Try again.</div>
       <div class="numpad">
@@ -395,26 +426,11 @@ tbody tr:hover{background:var(--bg)}
         <button class="nk" style="grid-column:span 2" onclick="pk('0')">0</button>
         <button class="nk" onclick="pdel()">⌫</button>
       </div>
+      <button class="btn-ghost" onclick="switchTab('login')">👤 Staff Login</button>
     </div>
-
-    <!-- ── Staff Login panel ── -->
-    <div id="f-login" class="h">
-      <div class="ltitle">Staff Login</div>
-      <div class="lsub">Sign in with your staff credentials</div>
-      <div id="login-err" class="errbox h"></div>
-      <div class="fg"><label class="fl">Email</label><input class="fi" type="email" id="l-email" placeholder="staff@fujupventures.com"/></div>
-      <div class="fg"><label class="fl">Password</label>
-        <div class="pw-w"><input class="fi" type="password" id="l-pass" placeholder="Password"/><span class="pw-eye" onclick="tpw('l-pass')">👁</span></div>
-      </div>
-      <button class="btn-pri" id="login-btn" onclick="doLogin()">Sign In →</button>
-    </div>
-
-    <div class="lfoot"><span class="pdot"></span>Firebase Sync · Secured</div>
+    <div class="lfoot"><span class="pdot"></span>Multi-device sync · <strong onclick="show('sa-screen')">Super Admin</strong></div>
   </div>
 </div>
-<!-- Hidden stubs so JS refs don't break -->
-<div id="sa-screen" class="h" style="display:none!important"></div>
-<div id="sa-pin-err" class="h" style="display:none"></div>
 
 <!-- ══ MAIN APP ══ -->
 <div id="app" class="h" style="display:none">
@@ -422,11 +438,11 @@ tbody tr:hover{background:var(--bg)}
 
 <aside class="sb" id="sidebar">
   <div class="sb-head">
-    <div class="sb-brand"><div class="sb-icon">📦</div><div class="sb-name">Fujup<span> Ventures</span></div></div>
+    <div class="sb-brand"><div class="sb-icon">📦</div><div class="sb-name">Fujup<span> Venture</span></div></div>
     <button class="sb-x" onclick="closeSB()">✕</button>
   </div>
-  <div class="sb-sa-bar h" id="sa-bar" style="display:none!important">🛡️ SUPER ADMIN</div>
-  <div class="sb-ctx h" id="ctx-bar" style="display:none!important">
+  <div class="sb-sa-bar h" id="sa-bar">🛡️ SUPER ADMIN</div>
+  <div class="sb-ctx h" id="ctx-bar">
     <span class="sb-ctx-name" id="ctx-name">Buyer</span>
     <span class="sb-ctx-back" onclick="exitCtx()">← Exit</span>
   </div>
@@ -441,8 +457,8 @@ tbody tr:hover{background:var(--bg)}
     <a class="sb-lk" data-pg="alerts" onclick="nav('alerts')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Alerts<span class="sb-badge" id="sb-notif"></span></a>
     <div class="sb-sec" id="admin-section">Admin</div>
     <a class="sb-lk" data-pg="staff" id="nav-staff" onclick="nav('staff')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Staff</a>
-    <!-- SA only: Buyers nav - hidden for single-user -->
-    <a class="sb-lk" data-pg="buyers" id="nav-buyers" onclick="nav('buyers')" style="display:none!important"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Buyers</a>
+    <!-- SA only: Buyers nav -->
+    <a class="sb-lk" data-pg="buyers" id="nav-buyers" onclick="nav('buyers')" style="display:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Buyers</a>
     <a class="sb-lk" data-pg="settings" id="nav-settings" onclick="nav('settings')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
   </nav>
   <div class="sb-foot">
@@ -612,8 +628,13 @@ tbody tr:hover{background:var(--bg)}
           <button class="btn btn-o btn-sm" onclick="exportSalesCSV()">💳 Export Sales CSV</button>
           <button class="btn btn-o btn-sm" onclick="loadDemo()">🧪 Load Demo Data</button>
         </div></div>
-        <!-- Hidden in single-user mode -->
-        <div class="card h" id="sa-pin-card" style="display:none!important"></div>
+        <!-- SA only -->
+        <div class="card h" id="sa-pin-card"><div class="card-head"><h3>🛡️ Super Admin PIN</h3></div><div class="card-body">
+          <div class="fg2"><label class="fl">Current SA PIN</label><input class="fc" type="password" id="sa-old" maxlength="4"/></div>
+          <div class="fg2"><label class="fl">New SA PIN</label><input class="fc" type="password" id="sa-new" maxlength="4"/></div>
+          <div class="fg2"><label class="fl">Confirm</label><input class="fc" type="password" id="sa-cf" maxlength="4"/></div>
+          <button class="btn btn-b btn-sm" onclick="changeSAPin()">Update SA PIN</button>
+        </div></div>
       </div>
     </div>
 
@@ -880,7 +901,6 @@ tbody tr:hover{background:var(--bg)}
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <script>
@@ -900,24 +920,21 @@ const FB = {
 };
 firebase.initializeApp(FB);
 const db  = firebase.firestore();
-const auth= firebase.auth();
 
-// ── SINGLE-USER CONFIG ─────────────────────────────
-// Fixed buyer document ID for Fujup Ventures
-const FUJUP_BID = 'fujup-ventures-main';
-// App PIN stored in Firestore system/config → app_pin (default below)
-let APP_PIN = '1234';
+// ── SUPER ADMIN PIN (stored in Firestore) ──────────
+const SA_PIN_DEFAULT = '1990';
+let SA_PIN = SA_PIN_DEFAULT;
 
 // ── APP STATE ──────────────────────────────────────
 let ME       = null;   // current user object
-let BID      = null;   // buyer ID (always FUJUP_BID after login)
-let SA_MODE  = false;  // kept false; retained for permission compat
+let BID      = null;   // current buyer ID (null = SA mode)
+let SA_MODE  = false;
 let PRODS    = [];
 let SALES    = [];
 let NOTIFS   = [];
 let STAFF    = [];
 let BUYERS   = [];
-let CFG      = { bizName:'Fujup Ventures', currency:'₦', threshold:10, address:'' };
+let CFG      = { bizName:'My Store', currency:'$', threshold:10, address:'' };
 let UNSUBS   = [];
 let DEL_TGT  = null;
 let RPT_MODE = 'daily';
@@ -956,55 +973,56 @@ function applyDark(){ document.documentElement.toggleAttribute('data-dark',DARK)
 function toggleDark(){ DARK=!DARK; localStorage.setItem('sp_dark',DARK?'1':'0'); applyDark(); }
 applyDark();
 
-// ── INIT: LOAD PIN FROM FIRESTORE ─────────────────
-async function initApp(){
-  // Restore cached PIN immediately so login works even if Firestore is slow
-  const cached = localStorage.getItem('fv_app_pin');
-  if(cached) APP_PIN = cached;
-  try {
-    const doc = await db.collection('system').doc('config').get();
-    if(doc.exists && doc.data().app_pin){
-      APP_PIN = doc.data().app_pin;
-      localStorage.setItem('fv_app_pin', APP_PIN);
-    }
-    // Load or create the Fujup Ventures buyer document
-    const bdoc = await db.collection('buyers').doc(FUJUP_BID).get();
-    if(bdoc.exists){
-      const bd = bdoc.data();
-      CFG = {bizName:bd.name||'Fujup Ventures', currency:bd.currency||'₦', threshold:bd.threshold||10, address:bd.address||''};
-    } else {
-      await db.collection('buyers').doc(FUJUP_BID).set({
-        name:'Fujup Ventures', currency:'₦', threshold:10, address:'', pin:'', adminName:'Admin', adminEmail:'', type:'shop',
-        createdAt:firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-  } catch(e){ console.warn('initApp:', e.message); }
+// ── INIT: LOAD SA PIN FROM FIRESTORE ──────────────
+function initApp(){
   g('loading').classList.add('h');
   show('lock-screen');
+  db.collection('system').doc('config').get()
+    .then(d=>{ if(d.exists&&d.data().sa_pin) SA_PIN=d.data().sa_pin; })
+    .catch(()=>{});
 }
 initApp();
 
-// ── SA PIN stubs (kept so references don't break) ──
+// ── SUPER ADMIN PIN ────────────────────────────────
 let sBuf='';
-function sPk(d){} function sPdel(){} function sDots(){} function sCheck(){}
+function sPk(d){ if(sBuf.length>=4)return; sBuf+=d; sDots(); if(sBuf.length===4) setTimeout(sCheck,160); }
+function sPdel(){ sBuf=sBuf.slice(0,-1); sDots(); g('sa-pin-err').classList.add('h'); }
+function sDots(){ for(let i=0;i<4;i++){const e=g('sd'+i);if(!e)return;e.className='pd'+(i<sBuf.length?' on':'');} }
+function sCheck(){
+  if(sBuf===SA_PIN){
+    SA_MODE=true; BID=null; ME={id:'superadmin',name:'Super Admin',role:'superadmin'};
+    show('app');
+    setupApp();
+    toast('Welcome, Super Admin 👑','s');
+  } else {
+    for(let i=0;i<4;i++){const e=g('sd'+i);if(e){e.className='pd err';}}
+    g('sa-pin-err').classList.remove('h');
+    setTimeout(()=>{ sBuf=''; sDots(); g('sa-pin-err').classList.add('h'); },1300);
+  }
+}
 
-// ── APP PIN (single user) ──────────────────────────
+// ── BUYER PIN ──────────────────────────────────────
 let pBuf='';
 function pk(d){ if(pBuf.length>=4)return; pBuf+=d; pDots(); if(pBuf.length===4) setTimeout(pCheck,160); }
 function pdel(){ pBuf=pBuf.slice(0,-1); pDots(); g('pin-err').classList.add('h'); }
 function pDots(){ for(let i=0;i<4;i++){const e=g('d'+i);if(!e)return;e.className='pd'+(i<pBuf.length?' on':'');} }
 async function pCheck(){
-  if(pBuf === APP_PIN){
-    BID = FUJUP_BID;
-    ME  = {id:'fujup-admin', name:'Admin', role:'admin', buyerId:FUJUP_BID};
-    show('app');
-    setupApp();
-    toast('Welcome to Fujup Ventures 👋','s');
-  } else {
-    for(let i=0;i<4;i++){const e=g('d'+i);if(e){e.className='pd err';}}
-    g('pin-err').classList.remove('h');
-    setTimeout(()=>{ pBuf=''; pDots(); g('pin-err').classList.add('h'); },1300);
-  }
+  try{
+    const snap = await db.collection('buyers').get();
+    const buyer = snap.docs.map(d=>({id:d.id,...d.data()})).find(b=>String(b.pin||'')=== pBuf);
+    if(buyer){
+      BID = buyer.id;
+      ME  = {id:'buyer-admin-'+BID, name:buyer.adminName||'Admin', role:'admin', buyerId:BID};
+      CFG = {bizName:buyer.name, currency:buyer.currency||'$', threshold:buyer.threshold||10, address:buyer.address||''};
+      show('app');
+      setupApp();
+      toast('Welcome to '+buyer.name+' 👋','s');
+    } else {
+      for(let i=0;i<4;i++){const e=g('d'+i);if(e){e.className='pd err';}}
+      g('pin-err').classList.remove('h');
+      setTimeout(()=>{ pBuf=''; pDots(); g('pin-err').classList.add('h'); },1300);
+    }
+  }catch(e){ toast('Connection error: '+e.message,'e'); pBuf=''; pDots(); }
 }
 
 // ── STAFF EMAIL LOGIN ──────────────────────────────
@@ -1012,30 +1030,48 @@ async function doLogin(){
   const email = g('l-email').value.trim().toLowerCase();
   const pass  = g('l-pass').value;
   if(!email||!pass) return ferr('login-err','Fill in all fields.');
-  const btn = g('login-btn');
-  btn.innerHTML='<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div>';
-  btn.disabled=true;
-  try{
-    const staffSnap = await db.collection('buyers').doc(FUJUP_BID).collection('staff')
-      .where('email','==',email).get();
-    if(staffSnap.empty) throw new Error('No staff account found for that email.');
-    const su = staffSnap.docs[0].data();
-    if(su.password !== pass) throw new Error('Incorrect password.');
-    BID = FUJUP_BID;
-    ME  = {id:staffSnap.docs[0].id, name:su.name, role:su.role, email:su.email, buyerId:FUJUP_BID};
+  g('login-btn').innerHTML='<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div>';
+  g('login-btn').disabled=true;
+
+  try {
+    // First: check if email matches a buyer admin directly (no index needed)
+    const allBuyers = await db.collection('buyers').get();
+    let foundBID = null, foundMe = null;
+    for(const bDoc of allBuyers.docs){
+      const bd = bDoc.data();
+      if(bd.adminEmail&&bd.adminEmail.toLowerCase()===email&&bd.adminPassword===pass){
+        foundBID=bDoc.id;
+        CFG={bizName:bd.name,currency:bd.currency||'$',threshold:bd.threshold||10,address:bd.address||''};
+        foundMe={id:'admin-'+bDoc.id,name:bd.adminName||'Admin',role:'admin',email:bd.adminEmail,buyerId:bDoc.id};
+        break;
+      }
+      const staffSnap = await bDoc.ref.collection('staff').get();
+      for(const sd of staffSnap.docs){
+        const su=sd.data();
+        if(su.email&&su.email.toLowerCase()===email&&su.password===pass){
+          foundBID=bDoc.id;
+          CFG={bizName:bd.name,currency:bd.currency||'$',threshold:bd.threshold||10,address:bd.address||''};
+          foundMe={id:sd.id,name:su.name,role:su.role,email:su.email,buyerId:bDoc.id};
+          break;
+        }
+      }
+      if(foundBID) break;
+    }
+    if(!foundBID){ throw new Error('Invalid email or password'); }
+    BID=foundBID; ME=foundMe;
     show('app'); setupApp();
-    toast('Welcome, '+su.name+' 👋','s');
+
   } catch(e){
-    ferr('login-err', e.message||'Login failed.');
+    ferr('login-err', e.message||'Login failed. Check your credentials.');
   } finally {
-    btn.innerHTML='Sign In →';
-    btn.disabled=false;
+    g('login-btn').innerHTML='Sign In →';
+    g('login-btn').disabled=false;
   }
 }
 
 // ── SETUP APP ──────────────────────────────────────
 function setupApp(){
-  const name = ME.name||'Admin';
+  const name = ME.name||'User';
   g('sb-av').textContent  = name.charAt(0).toUpperCase();
   g('sb-uname').textContent= name;
   g('sb-urole').textContent= ME.role.charAt(0).toUpperCase()+ME.role.slice(1);
@@ -1043,84 +1079,87 @@ function setupApp(){
   const h=new Date().getHours();
   g('dash-greet').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening')+', '+name.split(' ')[0]+' 👋';
   g('dash-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  // SA bars
+  const saBar=g('sa-bar'); const ctxBar=g('ctx-bar');
+  if(SA_MODE && !BID){ saBar.classList.remove('h'); ctxBar.classList.add('h'); }
+  else if(BID){ ctxBar.classList.remove('h'); saBar.classList.add('h'); g('ctx-name').textContent=CFG.bizName||'Buyer'; }
+  else { saBar.classList.add('h'); ctxBar.classList.add('h'); }
+  // Role-based nav
+  applyRoleNav();
   // Settings defaults
-  if(g('set-biz'))  g('set-biz').value  = CFG.bizName||'Fujup Ventures';
-  if(g('set-cur'))  g('set-cur').value  = CFG.currency||'₦';
+  if(g('set-biz'))  g('set-biz').value  = CFG.bizName||'';
+  if(g('set-cur'))  g('set-cur').value  = CFG.currency||'$';
   if(g('set-thr'))  g('set-thr').value  = CFG.threshold||10;
   if(g('set-addr')) g('set-addr').value = CFG.address||'';
   if(g('set-name')) g('set-name').value = name;
   if(g('set-role')) g('set-role').value = ME.role;
-  // Apply role nav
-  applyRoleNav();
+  // SA settings card
+  if(SA_MODE && !BID){ g('sa-pin-card')?.classList.remove('h'); g('pin-change-card')?.classList.add('h'); }
   // Subscribe to Firestore
-  subscribeData();
-  nav('dashboard');
+  subscribeData().then(()=>{
+    if(SA_MODE && !BID){ nav('buyers'); } else { nav('dashboard'); }
+  });
 }
 
 function applyRoleNav(){
   const sd = (id, show) => { const e=g(id); if(e) e.style.display=show?'flex':'none'; };
   const sb = (id, show) => { const e=g(id); if(e) e.style.display=show?'block':'none'; };
-  sd('nav-reports',    true);
-  sd('nav-staff',      true);
-  sd('admin-section',  true);
-  sd('nav-buyers',     false);  // always hidden for single-user
+  sd('nav-reports',    SA_MODE || can('rpt'));
+  sd('nav-staff',      SA_MODE || can('staff'));
+  sd('admin-section',  SA_MODE || can('staff'));
+  sd('nav-buyers',     SA_MODE && !BID);
   sd('nav-settings',   true);
-  sb('btn-add-prod',   true);
-  sb('btn-new-sale',   true);
-  sb('btn-rec-sale',   true);
-  sb('btn-add-staff',  true);
+  sb('btn-add-prod',   SA_MODE || can('prod'));
+  sb('btn-new-sale',   SA_MODE || can('sale'));
+  sb('btn-rec-sale',   SA_MODE || can('sale'));
+  sb('btn-add-staff',  SA_MODE || can('staff'));
 }
 
 // ── FIRESTORE SUBSCRIPTIONS ────────────────────────
-function subscribeData(){
+async function subscribeData(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
-  const base = db.collection('buyers').doc(FUJUP_BID);
-
-  // Products — try ordered, fall back to unordered if index missing
-  let u1;
-  const prodsHandler = snap => {
-    PRODS = snap.docs.map(d=>({id:d.id,...d.data()}));
-    // client-side sort: docs with dateAdded first (newest), then the rest
-    PRODS.sort((a,b)=>{
-      const ta = a.dateAdded?.toDate?.()?.getTime() || a.dateAdded || 0;
-      const tb = b.dateAdded?.toDate?.()?.getTime() || b.dateAdded || 0;
-      return tb - ta;
-    });
-    if(g('pg-products')?.classList.contains('on')) renderProds();
-    if(g('pg-dashboard')?.classList.contains('on')) renderDash();
-    checkLowStock();
-  };
-  try {
-    u1 = base.collection('products').orderBy('dateAdded','desc').onSnapshot(prodsHandler, err=>{
-      console.warn('products ordered query failed, falling back:', err.message);
-      // fallback: unordered snapshot
-      u1 = base.collection('products').onSnapshot(prodsHandler, err2=>console.warn('products:', err2));
-      UNSUBS[0] = u1;
-    });
-  } catch(e) {
-    u1 = base.collection('products').onSnapshot(prodsHandler, err=>console.warn('products:', err));
+  if(SA_MODE && !BID){
+    await loadBuyers();
+  } else if(BID){
+    await loadBranchData();
+    // Poll every 10 seconds to keep data fresh
+    const t = setInterval(loadBranchData, 10000);
+    UNSUBS=[()=>clearInterval(t)];
   }
+}
 
-  const u2 = base.collection('sales').orderBy('timestamp','desc').onSnapshot(snap=>{
-    SALES = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
-    if(g('pg-sales')?.classList.contains('on')) renderSales();
-    if(g('pg-dashboard')?.classList.contains('on')) renderDash();
-    if(g('pg-reports')?.classList.contains('on')) renderRpt();
-    updBadges();
-  }, err=>console.warn('sales:',err));
+async function loadBuyers(){
+  try{
+    const snap = await db.collection('buyers').get();
+    BUYERS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(document.getElementById('pg-buyers')?.classList.contains('on')) renderBuyers();
+    if(document.getElementById('pg-dashboard')?.classList.contains('on')) renderDash();
+  }catch(e){ console.warn('loadBuyers:',e.message); }
+}
 
-  const u3 = base.collection('notifications').orderBy('time','desc').limit(50).onSnapshot(snap=>{
-    NOTIFS = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
-    if(g('pg-alerts')?.classList.contains('on')) renderNotifs();
-    updBadges();
-  }, err=>console.warn('notifs:',err));
-
-  const u4 = base.collection('staff').onSnapshot(snap=>{
-    STAFF = snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(g('pg-staff')?.classList.contains('on')) renderStaff();
-  }, err=>console.warn('staff:',err));
-
-  UNSUBS=[u1,u2,u3,u4];
+async function loadBranchData(){
+  try{
+    const base = db.collection('buyers').doc(BID);
+    const [p,s,n,st] = await Promise.all([
+      base.collection('products').get(),
+      base.collection('sales').get(),
+      base.collection('notifications').get(),
+      base.collection('staff').get()
+    ]);
+    PRODS = p.docs.map(d=>({id:d.id,...d.data()}));
+    PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
+    SALES = s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
+    SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+    NOTIFS = n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
+    NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
+    NOTIFS = NOTIFS.slice(0,50);
+    STAFF = st.docs.map(d=>({id:d.id,...d.data()}));
+    // Refresh current page
+    const cur = document.querySelector('.pg.on')?.id?.replace('pg-','');
+    const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff};
+    if(cur&&map[cur]) map[cur]();
+    updBadges(); checkLowStock();
+  }catch(e){ console.warn('loadBranchData:',e.message); }
 }
 
 // ── NAVIGATION ─────────────────────────────────────
@@ -1141,19 +1180,27 @@ function closeSB(){ g('sidebar').classList.remove('open'); g('sb-ovl').classList
 // ── LOGOUT ─────────────────────────────────────────
 function logout(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
-  if(typeof CUST_UNSUB==='function'){ CUST_UNSUB(); CUST_UNSUB=null; }
   ME=null; BID=null; SA_MODE=false;
   PRODS=[]; SALES=[]; NOTIFS=[]; STAFF=[]; BUYERS=[];
-  if(typeof CUSTOMERS!=='undefined') CUSTOMERS=[];
-  pBuf=''; pDots();
-  show('lock-screen');
-  switchTab('pin');
+  pBuf=''; sBuf=''; pDots(); sDots();
+  g('l-email').value=''; g('l-pass').value='';
+  g('login-err').classList.add('h');
+  show('lock-screen'); switchTab('login');
 }
 
-function exitCtx(){ /* stub — no multi-buyer context in single-user */ }
+function exitCtx(){
+  UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
+  BID=null; PRODS=[]; SALES=[]; NOTIFS=[]; STAFF=[];
+  ME={id:'superadmin',name:'Super Admin',role:'superadmin'};
+  g('ctx-bar').classList.add('h');
+  g('sa-bar').classList.remove('h');
+  subscribeData();
+  nav('buyers');
+}
 
 // ── DASHBOARD ──────────────────────────────────────
 function renderDash(){
+  if(SA_MODE && !BID){ renderSADash(); return; }
   const today=new Date().toDateString();
   const tS=SALES.filter(s=>new Date(s.timestamp).toDateString()===today);
   const tR=tS.reduce((a,s)=>a+(s.total||0),0);
@@ -1177,6 +1224,19 @@ function renderDash(){
   :'<div class="empty" style="padding:24px"><div class="empty-icon">💳</div><div class="empty-sub">No sales yet</div></div>';
   drawChart('dash-chart',7);
   adjGrids();
+}
+
+function renderSADash(){
+  // SA overview across all buyers
+  const totalP=BUYERS.reduce((a,b)=>a+(b.prodCount||0),0);
+  const totalS=BUYERS.reduce((a,b)=>a+(b.saleCount||0),0);
+  const totalR=BUYERS.reduce((a,b)=>a+(b.revenue||0),0);
+  g('st-p').textContent=BUYERS.length+' buyers';
+  g('st-s').textContent=totalS;
+  g('st-r').textContent='$'+totalR.toFixed(2);
+  g('st-l').textContent=BUYERS.length;
+  g('low-list').innerHTML='<div style="padding:14px;text-align:center;color:var(--t3);font-size:.83rem">Select a buyer to view their inventory</div>';
+  g('dash-recent').innerHTML='<div class="empty" style="padding:24px"><div class="empty-icon">🏢</div><div class="empty-sub">Use the Buyers page to enter a buyer\'s inventory</div></div>';
 }
 
 // ── PRODUCTS ───────────────────────────────────────
@@ -1236,7 +1296,7 @@ function openProdModal(id){
 
 async function saveProd(){
   if(!can('prod')){toast('⛔ No permission','e');return;}
-  const effectiveProdBID = FUJUP_BID;
+  const effectiveProdBID = BID || ME?.buyerId; if(!effectiveProdBID){toast('Enter a buyer first from the Buyers page','e');return;}
   const name=g('pm-name').value.trim(), cat=g('pm-cat').value.trim();
   const price=parseFloat(g('pm-price').value), qty=parseInt(g('pm-qty').value);
   const eid=g('pm-id').value;
@@ -1256,8 +1316,8 @@ async function saveProd(){
 // ── DELETE ─────────────────────────────────────────
 function openDelModal(id,name){ if(!can('del')){toast('⛔ No permission','e');return;} DEL_TGT=id; g('del-name').textContent=name; openM('del-modal'); }
 async function confirmDel(){
-  if(!DEL_TGT)return;
-  const delBID = FUJUP_BID;
+  if(!DEL_TGT||!BID)return;
+  const delBID = BID || ME?.buyerId; if(!delBID)return;
   try{ await db.collection('buyers').doc(delBID).collection('products').doc(DEL_TGT).delete(); closeM('del-modal'); DEL_TGT=null; toast('Product deleted','s'); }
   catch(e){ toast('Delete failed: '+e.message,'e'); }
 }
@@ -1266,7 +1326,7 @@ async function confirmDel(){
 function openStockModal(pid){ if(!can('prod')){toast('⛔ No permission','e');return;} const p=PRODS.find(x=>x.id===pid); if(!p)return; g('sa-info').textContent=p.name+' — current: '+p.quantity+' units'; g('sa-pid').value=pid; g('sa-qty').value=''; g('sa-reason').value=''; g('sa-type').value='add'; openM('stock-modal'); }
 async function saveStockAdj(){
   const pid=g('sa-pid').value, type=g('sa-type').value, qty=parseInt(g('sa-qty').value), reason=g('sa-reason').value.trim();
-  const adjBID = FUJUP_BID; if(!pid)return;
+  const adjBID = BID || ME?.buyerId; if(!pid||!adjBID)return;
   if(isNaN(qty)||qty<0){toast('Enter valid quantity','e');return;}
   const p=PRODS.find(x=>x.id===pid); if(!p)return;
   let newQty=p.quantity;
@@ -1292,7 +1352,7 @@ let CART = [];  // [{productId, name, category, qty, unitPrice, subtotal}]
 
 function openSaleModal(){
   if(!can('sale')){toast('⛔ No permission to record sales','e');return;}
-  const activeBID = FUJUP_BID;
+  const activeBID = BID || ME?.buyerId;
   if(!activeBID){toast('You need to be logged into a buyer account to record sales.','e');return;}
   // Reset everything
   CART = [];
@@ -1423,7 +1483,7 @@ function clearCart(){
 
 async function saveSale(){
   if(!can('sale')){toast('⛔ No permission','e');return;}
-  const activeBID = FUJUP_BID;
+  const activeBID = BID || ME?.buyerId;
   if(!activeBID){ ferr('sm-err','No buyer context. Please logout and log back in.'); return; }
   if(CART.length === 0){ ferr('sm-err','Cart is empty — add at least one product.'); return; }
 
@@ -1506,7 +1566,7 @@ function showRcpt(sid){
 // Legacy single-item receipt
 function showRcptData(s){
   const bars=Array.from({length:28},(_,i)=>`<div style="width:${i%3===0?3:2}px;height:${28+Math.sin(i)*8}px;background:#111;display:inline-block;margin:0 0.5px"></div>`).join('');
-  g('rcpt-body').innerHTML=`<div class="rcpt"><div class="rcpt-logo">${esc(CFG.bizName||'Fujup Ventures')}</div><div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${String(s.id||'').slice(-6).toUpperCase()}</div><hr class="rcpt-div"/><div class="rcpt-row"><span>${esc(s.productName)}</span></div><div class="rcpt-row"><span style="color:#6B7280">  ${s.quantity} × ${fmt(s.unitPrice)}</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row rcpt-tot"><span>TOTAL</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row"><span style="color:#6B7280">Cashier</span><span>${esc(s.cashier||'—')}</span></div><div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${fmtDT(s.timestamp)}</span></div>${s.customer?`<div class="rcpt-row"><span style="color:#6B7280">Customer</span><span>${esc(s.customer)}</span></div>`:''}<hr class="rcpt-div"/><div style="text-align:center;margin:4px 0">${bars}</div><div class="rcpt-foot">Thank you! · Fujup Ventures</div></div>`;
+  g('rcpt-body').innerHTML=`<div class="rcpt"><div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div><div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${String(s.id||'').slice(-6).toUpperCase()}</div><hr class="rcpt-div"/><div class="rcpt-row"><span>${esc(s.productName)}</span></div><div class="rcpt-row"><span style="color:#6B7280">  ${s.quantity} × ${fmt(s.unitPrice)}</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row rcpt-tot"><span>TOTAL</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row"><span style="color:#6B7280">Cashier</span><span>${esc(s.cashier||'—')}</span></div><div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${fmtDT(s.timestamp)}</span></div>${s.customer?`<div class="rcpt-row"><span style="color:#6B7280">Customer</span><span>${esc(s.customer)}</span></div>`:''}<hr class="rcpt-div"/><div style="text-align:center;margin:4px 0">${bars}</div><div class="rcpt-foot">Thank you! · Fujup Venture</div></div>`;
   openM('rcpt-modal');
 }
 
@@ -1522,7 +1582,7 @@ function showCartReceipt(items, customer, grandTotal, receiptId, cashier, timest
 
   g('rcpt-body').innerHTML=`
     <div class="rcpt">
-      <div class="rcpt-logo">${esc(CFG.bizName||'Fujup Ventures')}</div>
+      <div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div>
       <div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${rcpNum}</div>
       <hr class="rcpt-div"/>
       <div class="rcpt-row" style="font-size:.7rem;color:#9CA3AF;margin-bottom:6px">
@@ -1541,7 +1601,7 @@ function showCartReceipt(items, customer, grandTotal, receiptId, cashier, timest
       <div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${date}</span></div>
       <hr class="rcpt-div"/>
       <div style="text-align:center;margin:4px 0">${bars}</div>
-      <div class="rcpt-foot">Thank you for your purchase!<br>Fujup Ventures</div>
+      <div class="rcpt-foot">Thank you for your purchase!<br>Fujup Venture</div>
     </div>`;
   openM('rcpt-modal');
 }
@@ -1595,7 +1655,7 @@ function drawChart(cid, days, salesData){
 
 // ── NOTIFICATIONS ──────────────────────────────────
 async function addNotif(type,title,text){
-  const BID_ = FUJUP_BID;
+  const notifBID = BID || ME?.buyerId; if(!notifBID)return; const BID_=notifBID;
   try{ await db.collection('buyers').doc(BID_).collection('notifications').add({type,title,text,time:firebase.firestore.FieldValue.serverTimestamp(),read:false,buyerId:BID_}); }catch(e){console.warn('notif:',e);}
 }
 function renderNotifs(){
@@ -1603,9 +1663,9 @@ function renderNotifs(){
   el.innerHTML=NOTIFS.length?NOTIFS.map(n=>`<div class="ni ${n.read?'read':'unread'} ${n.type==='warn'?'warn':''}" onclick="markRead('${n.id}')"><div class="ni-icon" style="background:${n.type==='warn'?'rgba(245,158,11,.12)':'rgba(37,99,235,.1)'}">${n.type==='warn'?'⚠️':'ℹ️'}</div><div style="flex:1"><div class="ni-title">${esc(n.title)}</div><div class="ni-text">${esc(n.text)}</div><div class="ni-time">${tAgo(n.time)}</div></div>${!n.read?'<div class="ni-dot"></div>':''}</div>`).join('')
   :'<div class="empty"><div class="empty-icon">🔔</div><div class="empty-title">No alerts</div><div class="empty-sub">All caught up!</div></div>';
 }
-async function markRead(id){ const b=FUJUP_BID; try{ await db.collection('buyers').doc(b).collection('notifications').doc(id).update({read:true}); }catch(e){} }
-async function markAllRead(){ const b=FUJUP_BID; const batch=db.batch(); NOTIFS.filter(n=>!n.read).forEach(n=>batch.update(db.collection('buyers').doc(b).collection('notifications').doc(n.id),{read:true})); try{await batch.commit();toast('All read','s');}catch(e){} }
-function checkLowStock(){ const cb=FUJUP_BID; PRODS.filter(p=>p.quantity<=(p.lowAt||CFG.threshold)).forEach(p=>{ const exists=NOTIFS.some(n=>!n.read&&n.text?.includes(p.name)); if(!exists) addNotif('warn','Low Stock',p.name+' is low ('+p.quantity+' units).'); }); }
+async function markRead(id){ const b=BID||ME?.buyerId; if(!b)return; try{ await db.collection('buyers').doc(b).collection('notifications').doc(id).update({read:true}); }catch(e){} }
+async function markAllRead(){ const b=BID||ME?.buyerId; if(!b)return; const batch=db.batch(); NOTIFS.filter(n=>!n.read).forEach(n=>batch.update(db.collection('buyers').doc(b).collection('notifications').doc(n.id),{read:true})); try{await batch.commit();toast('All read','s');}catch(e){} }
+function checkLowStock(){ const cb=BID||ME?.buyerId; if(!cb)return; PRODS.filter(p=>p.quantity<=(p.lowAt||CFG.threshold)).forEach(p=>{ const exists=NOTIFS.some(n=>!n.read&&n.text?.includes(p.name)); if(!exists) addNotif('warn','Low Stock',p.name+' is low ('+p.quantity+' units).'); }); }
 function updBadges(){ const u=NOTIFS.filter(n=>!n.read).length; const ts=SALES.filter(s=>new Date(s.timestamp).toDateString()===new Date().toDateString()).length; g('sb-notif').textContent=u||''; g('sb-sales').textContent=ts||''; u>0?g('tb-ndot').classList.remove('h'):g('tb-ndot').classList.add('h'); }
 
 // ── STAFF ──────────────────────────────────────────
@@ -1623,13 +1683,13 @@ function openStaffModal(id){
 }
 async function saveStaff(){
   if(!can('staff')){toast('⛔ No permission','e');return;}
-  
+  if(!BID){toast('No buyer context','e');return;}
   const name=g('stm-name').value.trim(),email=g('stm-email').value.trim().toLowerCase(),pass=g('stm-pass').value,role=g('stm-role').value,phone=g('stm-phone').value.trim(),eid=g('stm-id').value;
-  const effectiveBID = FUJUP_BID;
+  const effectiveBID = BID || ME?.buyerId;
   if(!name||!email)return ferr('stm-err','Name and email required.');
   if(!eid&&!pass)return ferr('stm-err','Password required for new staff.');
   if(pass&&pass.length<6)return ferr('stm-err','Password must be 6+ chars.');
-  
+  if(!effectiveBID)return ferr('stm-err','No buyer selected. Enter a buyer first from the Buyers page.');
   const data={name,email,role,phone,buyerId:effectiveBID};
   if(pass) data.password=pass;
   try{
@@ -1638,7 +1698,7 @@ async function saveStaff(){
     closeM('staff-modal'); toast(eid?'Staff updated!':'Staff added!','s');
   }catch(e){ferr('stm-err','Failed: '+e.message);}
 }
-async function removeStaff(id,name){ if(!confirm('Remove '+name+'?'))return; const b=FUJUP_BID; try{await db.collection('buyers').doc(b).collection('staff').doc(id).delete();toast('Staff removed','s');}catch(e){toast('Failed: '+e.message,'e');} }
+async function removeStaff(id,name){ if(!confirm('Remove '+name+'?'))return; const b=BID||ME?.buyerId; if(!b)return; try{await db.collection('buyers').doc(b).collection('staff').doc(id).delete();toast('Staff removed','s');}catch(e){toast('Failed: '+e.message,'e');} }
 
 // ── BUYERS (Super Admin) ───────────────────────────
 async function renderBuyers(){
@@ -1688,46 +1748,102 @@ async function renderBuyers(){
   :'<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🏢</div><div class="empty-title">No buyers yet</div><div class="empty-sub">Create your first buyer to get started</div></div>';
 }
 
-// Buyers management — stubs (not used in single-user mode)
-async function enterBuyer(bid){}
-function openBuyerModal(id){}
-async function saveBuyer(){}
-async function deleteBuyer(id,name){}
+async function enterBuyer(bid){
+  const buyer=BUYERS.find(b=>b.id===bid); if(!buyer)return;
+  BID=bid;
+  ME={id:'sa-in-buyer',name:'Super Admin',role:'admin',buyerId:bid};
+  CFG={bizName:buyer.name,currency:buyer.currency||'$',threshold:buyer.threshold||10,address:buyer.address||''};
+  g('sa-bar').classList.add('h');
+  g('ctx-bar').classList.remove('h');
+  g('ctx-name').textContent=buyer.name;
+  applyRoleNav();  // applyRoleNav will handle hiding buyers nav
+  if(g('set-biz')) g('set-biz').value=CFG.bizName;
+  if(g('set-cur')) g('set-cur').value=CFG.currency;
+  if(g('set-thr')) g('set-thr').value=CFG.threshold;
+  UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
+  await subscribeData();
+  nav('dashboard');
+  toast('Entered '+buyer.name+' as Admin','s');
+}
+
+function openBuyerModal(id){
+  g('bm-err').classList.add('h');
+  if(id){const b=BUYERS.find(x=>x.id===id);if(!b)return;g('bm-t').textContent='Edit Buyer';g('bm-id').value=id;g('bm-name').value=b.name;g('bm-email').value=b.adminEmail;g('bm-pass').value='';g('bm-pin').value=b.pin||'';g('bm-cur').value=b.currency||'$';g('bm-type').value=b.type||'shop';g('bm-addr').value=b.address||'';}
+  else{g('bm-t').textContent='Create Buyer';g('bm-id').value='';['bm-name','bm-email','bm-pass','bm-pin','bm-addr'].forEach(f=>g(f).value='');g('bm-cur').value='$';g('bm-type').value='shop';}
+  openM('buyer-modal');
+}
+async function saveBuyer(){
+  const name=g('bm-name').value.trim(),email=g('bm-email').value.trim(),pass=g('bm-pass').value,pin=g('bm-pin').value.trim(),cur=g('bm-cur').value.trim()||'$',type=g('bm-type').value,addr=g('bm-addr').value.trim(),eid=g('bm-id').value;
+  if(!name||!email)return ferr('bm-err','Name and email required.');
+  if(!eid&&!pass)return ferr('bm-err','Admin password required.');
+  if(pass&&pass.length<6)return ferr('bm-err','Password must be 6+ chars.');
+  if(pin&&!/^\d{4}$/.test(pin))return ferr('bm-err','PIN must be 4 digits.');
+  const data={name,adminEmail:email,adminName:'Admin',pin:pin||'',currency:cur,type,address:addr,threshold:10};
+  if(pass) data.adminPassword=pass;
+  // Show saving indicator
+  ferr('bm-err','Saving...');
+  g('bm-err').style.background='#EFF6FF';g('bm-err').style.color='#1D4ED8';g('bm-err').style.borderColor='#BFDBFE';
+  try{
+    if(eid){
+      await db.collection('buyers').doc(eid).update(data);
+      g('bm-err').classList.add('h');
+      closeM('buyer-modal'); toast('Buyer updated!','s');
+    } else {
+      const ref = await db.collection('buyers').add({...data,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      g('bm-err').classList.add('h');
+      closeM('buyer-modal');
+      toast('Buyer created! 🎉','s');
+      await loadBuyers();
+      renderBuyers();
+      setTimeout(()=>enterBuyer(ref.id), 800);
+    }
+  }catch(e){
+    g('bm-err').style.background='';g('bm-err').style.color='';g('bm-err').style.borderColor='';
+    ferr('bm-err','ERROR: '+e.message+' (code:'+e.code+')');
+    alert('Save failed: '+e.message);
+  }
+}
+async function deleteBuyer(id,name){
+  if(!confirm('Delete buyer "'+name+'"? ALL their data will be deleted permanently!'))return;
+  try{await db.collection('buyers').doc(id).delete();toast('Buyer deleted','s');}catch(e){toast('Failed: '+e.message,'e');}
+}
 
 // ── SETTINGS ──────────────────────────────────────
 async function saveSettings(){
-  CFG.bizName=g('set-biz').value.trim()||'Fujup Ventures';
-  CFG.currency=g('set-cur').value.trim()||'₦';
+  CFG.bizName=g('set-biz').value.trim()||'My Store';
+  CFG.currency=g('set-cur').value.trim()||'$';
   CFG.threshold=parseInt(g('set-thr').value)||10;
   CFG.address=g('set-addr').value.trim();
-  try{
-    await db.collection('buyers').doc(FUJUP_BID).update({name:CFG.bizName,currency:CFG.currency,threshold:CFG.threshold,address:CFG.address});
-    toast('Settings saved!','s');
-  }catch(e){toast('Save failed: '+e.message,'e');}
+  const sb=BID||ME?.buyerId; if(sb){try{await db.collection('buyers').doc(sb).update({name:CFG.bizName,currency:CFG.currency,threshold:CFG.threshold,address:CFG.address}); toast('Settings saved!','s');}catch(e){toast('Save failed: '+e.message,'e');}}
+  else toast('Settings saved locally','s');
 }
 
 async function changePIN(){
-  const old=g('s-old').value, nw=g('s-new').value, cf=g('s-cf').value;
-  if(old!==APP_PIN) return toast('Current PIN is incorrect','e');
-  if(!/^\d{4}$/.test(nw)) return toast('PIN must be 4 digits','e');
-  if(nw!==cf) return toast('PINs do not match','e');
-  try{
-    await db.collection('system').doc('config').set({app_pin:nw},{merge:true});
-    APP_PIN=nw;
-    localStorage.setItem('fv_app_pin', nw);
-    g('s-old').value=''; g('s-new').value=''; g('s-cf').value='';
-    toast('PIN updated!','s');
-  }catch(e){toast('Failed: '+e.message,'e');}
+  if(!BID){toast('Enter a buyer context first','e');return;}
+  const old=g('s-old').value,nw=g('s-new').value,cf=g('s-cf').value;
+  const buyer=BUYERS.find(b=>b.id===BID)||await db.collection('buyers').doc(BID).get().then(d=>d.data());
+  if(!buyer)return;
+  if(old!==(buyer.pin||''))return toast('Current PIN is incorrect','e');
+  if(!/^\d{4}$/.test(nw))return toast('PIN must be 4 digits','e');
+  if(nw!==cf)return toast('PINs do not match','e');
+  try{await db.collection('buyers').doc(BID).update({pin:nw});g('s-old').value='';g('s-new').value='';g('s-cf').value='';toast('PIN updated!','s');}catch(e){toast('Failed: '+e.message,'e');}
 }
 
-async function changeSAPin(){ toast('Use the Change PIN card above','i'); }
+async function changeSAPin(){
+  const old=g('sa-old').value,nw=g('sa-new').value,cf=g('sa-cf').value;
+  if(old!==SA_PIN)return toast('Current SA PIN incorrect','e');
+  if(!/^\d{4}$/.test(nw))return toast('PIN must be 4 digits','e');
+  if(nw!==cf)return toast('PINs do not match','e');
+  try{await db.collection('system').doc('config').set({sa_pin:nw},{merge:true});SA_PIN=nw;g('sa-old').value='';g('sa-new').value='';g('sa-cf').value='';toast('SA PIN updated!','s');}catch(e){toast('Failed: '+e.message,'e');}
+}
 
 function updateProfile(){ const name=g('set-name').value.trim(); if(!name)return; ME.name=name; g('sb-av').textContent=name.charAt(0); g('tb-av').textContent=name.charAt(0); g('sb-uname').textContent=name; toast('Profile updated!','s'); }
 
 // ── DEMO DATA ──────────────────────────────────────
 async function loadDemo(){
-  if(!confirm('Add demo products & sales to Fujup Ventures?'))return;
-  const col=db.collection('buyers').doc(FUJUP_BID);
+  if(!BID){toast('Enter a buyer context first to load demo data','e');return;}
+  if(!confirm('Add demo products & sales to this buyer?'))return;
+  const col=db.collection('buyers').doc(BID);
   const DP=[
     {name:'Paracetamol 500mg',category:'Medicine',price:2.50,costPrice:1.20,quantity:45,sku:'MED-001',supplier:'PharmaCo',lowAt:10},
     {name:'Ibuprofen 400mg',category:'Medicine',price:3.20,costPrice:1.80,quantity:8,sku:'MED-002',supplier:'PharmaCo',lowAt:10},
@@ -1741,14 +1857,14 @@ async function loadDemo(){
     {name:'Toothpaste 100ml',category:'Hygiene',price:2.00,costPrice:1.00,quantity:65,sku:'HYG-003',supplier:'CleanLife',lowAt:15},
   ];
   const batch=db.batch();
-  DP.forEach(p=>batch.set(col.collection('products').doc(),{...p,buyerId:FUJUP_BID,dateAdded:firebase.firestore.FieldValue.serverTimestamp()}));
+  DP.forEach(p=>batch.set(col.collection('products').doc(),{...p,buyerId:BID,dateAdded:firebase.firestore.FieldValue.serverTimestamp()}));
   await batch.commit();
   // Add sales
   const batch2=db.batch();
   for(let i=0;i<20;i++){
     const p=DP[i%DP.length];const q=Math.floor(1+Math.random()*4);
     const ts=new Date();ts.setDate(ts.getDate()-Math.floor(Math.random()*7));ts.setHours(8+Math.floor(Math.random()*10));
-    batch2.set(col.collection('sales').doc(),{productName:p.name,category:p.category,quantity:q,unitPrice:p.price,total:q*p.price,cashier:'Admin',customer:'',timestamp:ts,buyerId:FUJUP_BID});
+    batch2.set(col.collection('sales').doc(),{productName:p.name,category:p.category,quantity:q,unitPrice:p.price,total:q*p.price,cashier:'Admin',customer:'',timestamp:ts,buyerId:BID});
   }
   await batch2.commit();
   toast('Demo data loaded! '+DP.length+' products & 20 sales.','s');
@@ -1765,23 +1881,17 @@ window.addEventListener('resize',()=>{ adjGrids(); if(g('pg-dashboard')?.classLi
 adjGrids();
 
 // ── LOCK TAB SWITCH ────────────────────────────────
-function switchTab(t){
-  g('t-pin').classList.toggle('on', t==='pin');
-  g('t-login').classList.toggle('on', t==='login');
-  g('f-pin').classList.toggle('h', t!=='pin');
-  g('f-login').classList.toggle('h', t!=='login');
-  g('login-err').classList.add('h');
-  g('pin-err').classList.add('h');
-  pBuf=''; pDots();
-}
+function switchTab(t){ g('t-login').classList.toggle('on',t==='login'); g('t-pin').classList.toggle('on',t==='pin'); g('f-login').classList.toggle('h',t!=='login'); g('f-pin').classList.toggle('h',t!=='pin'); g('login-err').classList.add('h'); g('pin-err').classList.add('h'); pBuf=''; pDots(); }
 
 // ── KEYBOARD ──────────────────────────────────────
 document.addEventListener('keydown',e=>{
-  const pinVis=!g('lock-screen').classList.contains('h') && !g('f-pin').classList.contains('h');
+  const saVis=!g('sa-screen').classList.contains('h');
+  const pinVis=!g('lock-screen').classList.contains('h')&&!g('f-pin').classList.contains('h');
+  if(saVis){if(e.key>='0'&&e.key<='9')sPk(e.key);if(e.key==='Backspace')sPdel();}
   if(pinVis){if(e.key>='0'&&e.key<='9')pk(e.key);if(e.key==='Backspace')pdel();}
   if(e.key==='Escape'){['prod-modal','sale-modal','del-modal','stock-modal','staff-modal','buyer-modal','rcpt-modal'].forEach(closeM);closeSB();}
-  const loginVis=!g('lock-screen').classList.contains('h') && !g('f-login').classList.contains('h');
-  if(loginVis&&e.key==='Enter') doLogin();
+  const appVis=!g('app').classList.contains('h');
+  if(appVis&&e.key==='Enter'&&document.activeElement?.id==='l-pass')doLogin();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -1792,16 +1902,14 @@ document.addEventListener('keydown',e=>{
 let CUSTOMERS = [];
 let CUST_UNSUB = null;
 
-function subscribeCustomers(){
-  const b = FUJUP_BID;
-  if(CUST_UNSUB) CUST_UNSUB();
-  CUST_UNSUB = db.collection('buyers').doc(b).collection('customers')
-    .orderBy('name','asc')
-    .onSnapshot(snap=>{
-      CUSTOMERS = snap.docs.map(d=>({id:d.id,...d.data()}));
-      if(g('pg-customers')?.classList.contains('on')) renderCustomers();
-      populateCustDl();
-    }, e=>console.warn('customers:',e));
+async function subscribeCustomers(){
+  const b = BID||ME?.buyerId; if(!b) return;
+  try{
+    const snap = await db.collection('buyers').doc(b).collection('customers').get();
+    CUSTOMERS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(g('pg-customers')?.classList.contains('on')) renderCustomers();
+    populateCustDl();
+  }catch(e){ console.warn('customers:',e.message); }
 }
 
 function populateCustDl(){
@@ -1863,7 +1971,7 @@ function openCustModal(id){
 }
 
 async function saveCust(){
-  const b=FUJUP_BID;
+  const b=BID||ME?.buyerId; if(!b){toast('No buyer context','e');return;}
   const name=g('cm-name').value.trim(), phone=g('cm-phone').value.trim();
   if(!name) return ferr('cm-err','Full name is required.');
   if(!phone) return ferr('cm-err','Phone number is required.');
@@ -1879,7 +1987,7 @@ async function saveCust(){
 
 async function delCust(id,name){
   if(!confirm('Delete customer "'+name+'"?')) return;
-  const b=FUJUP_BID;
+  const b=BID||ME?.buyerId; if(!b) return;
   try{await db.collection('buyers').doc(b).collection('customers').doc(id).delete();toast('Customer removed','s');}
   catch(e){toast('Failed: '+e.message,'e');}
 }
@@ -2038,7 +2146,7 @@ function changeCartQty(index,delta){
 // ── UPGRADED openSaleModal ────────────────────────
 function openSaleModal(){
   if(!can('sale')){toast('⛔ No permission to record sales','e');return;}
-  const activeBID=FUJUP_BID;
+  const activeBID=BID||ME?.buyerId;
   if(!activeBID){toast('You need to be logged into a buyer account to record sales.','e');return;}
   CART=[];
   g('sm-err').classList.add('h');
@@ -2065,7 +2173,7 @@ function openSaleModal(){
 // ── UPGRADED saveSale ─────────────────────────────
 async function saveSale(){
   if(!can('sale')){toast('⛔ No permission','e');return;}
-  const activeBID=FUJUP_BID;
+  const activeBID=BID||ME?.buyerId;
   if(!activeBID){ferr('sm-err','No buyer context. Please logout and log back in.');return;}
   if(CART.length===0){ferr('sm-err','Cart is empty — add at least one product.');return;}
 
@@ -2202,7 +2310,7 @@ async function confirmVoid(){
   const sid=g('void-sale-id').value;
   const reason=g('void-reason').value;
   const notes=g('void-notes').value.trim();
-  const b=FUJUP_BID; if(!sid) return;
+  const b=BID||ME?.buyerId; if(!b||!sid) return;
   const sale=SALES.find(x=>x.id===sid); if(!sale) return;
   try{
     const batch=db.batch();
@@ -2299,7 +2407,7 @@ renderProds=function(){
 const _origSaveProd=saveProd;
 saveProd=async function(){
   if(!can('prod')){toast('⛔ No permission to edit products','e');return;}
-  const effectiveProdBID=FUJUP_BID;
+  const effectiveProdBID=BID||ME?.buyerId; if(!effectiveProdBID){toast('Enter a buyer first from the Buyers page','e');return;}
   const name=g('pm-name').value.trim(),cat=g('pm-cat').value.trim();
   const price=parseFloat(g('pm-price').value),qty=parseInt(g('pm-qty').value);
   const eid=g('pm-id').value;
@@ -2360,7 +2468,7 @@ showCartReceipt=function(items,customer,grandTotal,receiptId,cashier,timestamp,p
   `).join('<div style="height:3px"></div>');
   g('rcpt-body').innerHTML=`
     <div class="rcpt">
-      <div class="rcpt-logo">${esc(CFG.bizName||'Fujup Ventures')}</div>
+      <div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div>
       <div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${rcpNum}</div>
       <hr class="rcpt-div"/>
       <div class="rcpt-row" style="font-size:.7rem;color:#9CA3AF;margin-bottom:5px"><span>ITEM</span><span>AMOUNT</span></div>
@@ -2376,7 +2484,7 @@ showCartReceipt=function(items,customer,grandTotal,receiptId,cashier,timestamp,p
       <div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${date}</span></div>
       <hr class="rcpt-div"/>
       <div style="text-align:center;margin:4px 0">${bars}</div>
-      <div class="rcpt-foot">Thank you for your purchase!<br>Fujup Ventures</div>
+      <div class="rcpt-foot">Thank you for your purchase!<br>Fujup Venture</div>
     </div>`;
   openM('rcpt-modal');
 };
@@ -2401,12 +2509,12 @@ nav=function(pg){
 const _origApplyRoleNav=applyRoleNav;
 applyRoleNav=function(){
   _origApplyRoleNav();
-  const nc=g('nav-customers'); if(nc) nc.style.display='flex';
+  const nc=g('nav-customers'); if(nc) nc.style.display=(SA_MODE||BID||ME?.buyerId)?'flex':'none';
 };
 
 
 
-console.log('%c Fujup Ventures — Inventory System ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
+console.log('%c Fujup Venture ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
 </script>
 </body>
 </html>
