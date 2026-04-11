@@ -973,14 +973,15 @@ function applyDark(){ document.documentElement.toggleAttribute('data-dark',DARK)
 function toggleDark(){ DARK=!DARK; localStorage.setItem('sp_dark',DARK?'1':'0'); applyDark(); }
 applyDark();
 
-// ── INIT: LOAD SA PIN FROM FIRESTORE ──────────────
-async function initApp(){
-  try {
-    const doc = await db.collection('system').doc('config').get();
-    if(doc.exists && doc.data().sa_pin) SA_PIN = doc.data().sa_pin;
-  } catch(e){ console.warn('SA pin load:', e.message); }
+// ── INIT ──────────────────────────────────────────
+function initApp(){
+  // Show login screen immediately — do NOT wait for Firebase
   g('loading').classList.add('h');
   show('lock-screen');
+  // Load SA PIN in background quietly
+  db.collection('system').doc('config').get()
+    .then(doc=>{ if(doc.exists && doc.data().sa_pin) SA_PIN = doc.data().sa_pin; })
+    .catch(e=>{ console.warn('SA pin:', e.message); });
 }
 initApp();
 
