@@ -911,15 +911,15 @@ tbody tr:hover{background:var(--bg)}
 
 // ── FIREBASE CONFIG ────────────────────────────────
 const FB = {
-  apiKey:"AIzaSyCuTK8-gtJDFxUD8f2YOKgG54xPebKEfmg",
-  authDomain:"fujup-ventures.firebaseapp.com",
-  projectId:"fujup-ventures",
-  storageBucket:"fujup-ventures.firebasestorage.app",
-  messagingSenderId:"77667389516",
-  appId:"1:77667389516:web:8ed5fcf7e015c9776f64e9"
+  apiKey:"AIzaSyB9WqesX357dSP-gtPaao7zXBhEJhPgzFg",
+  authDomain:"fujup-d6674.firebaseapp.com",
+  projectId:"fujup-d6674",
+  storageBucket:"fujup-d6674.firebasestorage.app",
+  messagingSenderId:"486231016983",
+  appId:"1:486231016983:web:34b2070044d1b93ece7e52"
 };
 firebase.initializeApp(FB);
-const db  = firebase.firestore();
+const db = firebase.firestore();
 
 // ── SUPER ADMIN PIN (stored in Firestore) ──────────
 const SA_PIN_DEFAULT = '1990';
@@ -1008,15 +1008,13 @@ function pdel(){ pBuf=pBuf.slice(0,-1); pDots(); g('pin-err').classList.add('h')
 function pDots(){ for(let i=0;i<4;i++){const e=g('d'+i);if(!e)return;e.className='pd'+(i<pBuf.length?' on':'');} }
 async function pCheck(){
   try{
-    const snap = await db.collection('buyers').get();
-    const buyer = snap.docs.map(d=>({id:d.id,...d.data()})).find(b=>String(b.pin||'')=== pBuf);
+    const snap=await db.collection('buyers').get();
+    const buyer=snap.docs.map(d=>({id:d.id,...d.data()})).find(b=>String(b.pin||'')=== pBuf);
     if(buyer){
-      BID = buyer.id;
-      ME  = {id:'buyer-admin-'+BID, name:buyer.adminName||'Admin', role:'admin', buyerId:BID};
-      CFG = {bizName:buyer.name, currency:buyer.currency||'$', threshold:buyer.threshold||10, address:buyer.address||''};
-      show('app');
-      setupApp();
-      toast('Welcome to '+buyer.name+' 👋','s');
+      BID=buyer.id;
+      ME={id:'buyer-admin-'+BID,name:buyer.adminName||'Admin',role:'admin',buyerId:BID};
+      CFG={bizName:buyer.name,currency:buyer.currency||'$',threshold:buyer.threshold||10,address:buyer.address||''};
+      show('app'); setupApp(); toast('Welcome to '+buyer.name+' 👋','s');
     } else {
       for(let i=0;i<4;i++){const e=g('d'+i);if(e){e.className='pd err';}}
       g('pin-err').classList.remove('h');
@@ -1034,18 +1032,17 @@ async function doLogin(){
   g('login-btn').disabled=true;
 
   try {
-    // First: check if email matches a buyer admin directly (no index needed)
-    const allBuyers = await db.collection('buyers').get();
-    let foundBID = null, foundMe = null;
+    const allBuyers=await db.collection('buyers').get();
+    let foundBID=null,foundMe=null;
     for(const bDoc of allBuyers.docs){
-      const bd = bDoc.data();
+      const bd=bDoc.data();
       if(bd.adminEmail&&bd.adminEmail.toLowerCase()===email&&bd.adminPassword===pass){
         foundBID=bDoc.id;
         CFG={bizName:bd.name,currency:bd.currency||'$',threshold:bd.threshold||10,address:bd.address||''};
         foundMe={id:'admin-'+bDoc.id,name:bd.adminName||'Admin',role:'admin',email:bd.adminEmail,buyerId:bDoc.id};
         break;
       }
-      const staffSnap = await bDoc.ref.collection('staff').get();
+      const staffSnap=await bDoc.ref.collection('staff').get();
       for(const sd of staffSnap.docs){
         const su=sd.data();
         if(su.email&&su.email.toLowerCase()===email&&su.password===pass){
@@ -1096,9 +1093,7 @@ function setupApp(){
   // SA settings card
   if(SA_MODE && !BID){ g('sa-pin-card')?.classList.remove('h'); g('pin-change-card')?.classList.add('h'); }
   // Subscribe to Firestore
-  subscribeData().then(()=>{
-    if(SA_MODE && !BID){ nav('buyers'); } else { nav('dashboard'); }
-  });
+  subscribeData().then(()=>{ if(SA_MODE && !BID){ nav('buyers'); } else { nav('dashboard'); } });
 }
 
 function applyRoleNav(){
@@ -1120,46 +1115,35 @@ async function subscribeData(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
   if(SA_MODE && !BID){
     await loadBuyers();
+    const t=setInterval(loadBuyers,8000); UNSUBS=[()=>clearInterval(t)];
   } else if(BID){
     await loadBranchData();
-    // Poll every 10 seconds to keep data fresh
-    const t = setInterval(loadBranchData, 10000);
-    UNSUBS=[()=>clearInterval(t)];
+    const t=setInterval(loadBranchData,8000); UNSUBS=[()=>clearInterval(t)];
   }
 }
-
 async function loadBuyers(){
   try{
-    const snap = await db.collection('buyers').get();
-    BUYERS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const snap=await db.collection('buyers').get();
+    BUYERS=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(document.getElementById('pg-buyers')?.classList.contains('on')) renderBuyers();
     if(document.getElementById('pg-dashboard')?.classList.contains('on')) renderDash();
-  }catch(e){ console.warn('loadBuyers:',e.message); }
+  }catch(e){console.warn('buyers:',e.message);}
 }
-
 async function loadBranchData(){
+  if(!BID) return;
   try{
-    const base = db.collection('buyers').doc(BID);
-    const [p,s,n,st] = await Promise.all([
-      base.collection('products').get(),
-      base.collection('sales').get(),
-      base.collection('notifications').get(),
-      base.collection('staff').get()
-    ]);
-    PRODS = p.docs.map(d=>({id:d.id,...d.data()}));
-    PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
-    SALES = s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
+    const base=db.collection('buyers').doc(BID);
+    const [p,s,n,st]=await Promise.all([base.collection('products').get(),base.collection('sales').get(),base.collection('notifications').get(),base.collection('staff').get()]);
+    PRODS=p.docs.map(d=>({id:d.id,...d.data()})); PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
+    SALES=s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
     SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
-    NOTIFS = n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
-    NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
-    NOTIFS = NOTIFS.slice(0,50);
-    STAFF = st.docs.map(d=>({id:d.id,...d.data()}));
-    // Refresh current page
-    const cur = document.querySelector('.pg.on')?.id?.replace('pg-','');
+    NOTIFS=n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
+    NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time)); NOTIFS=NOTIFS.slice(0,50);
+    STAFF=st.docs.map(d=>({id:d.id,...d.data()}));
+    const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
     const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff};
-    if(cur&&map[cur]) map[cur]();
-    updBadges(); checkLowStock();
-  }catch(e){ console.warn('loadBranchData:',e.message); }
+    if(cur&&map[cur])map[cur](); updBadges(); checkLowStock();
+  }catch(e){console.warn('branch:',e.message);}
 }
 
 // ── NAVIGATION ─────────────────────────────────────
@@ -1169,7 +1153,7 @@ function nav(pg){
   const p=g('pg-'+pg); if(p) p.classList.add('on');
   const l=document.querySelector('[data-pg="'+pg+'"]'); if(l) l.classList.add('on');
   g('tb-title').textContent=pg.charAt(0).toUpperCase()+pg.slice(1);
-  const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff,buyers:renderBuyers};
+  const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff,buyers:()=>loadBuyers().then(renderBuyers)};
   if(map[pg]) map[pg]();
   closeSB();
 }
@@ -1780,28 +1764,20 @@ async function saveBuyer(){
   if(pin&&!/^\d{4}$/.test(pin))return ferr('bm-err','PIN must be 4 digits.');
   const data={name,adminEmail:email,adminName:'Admin',pin:pin||'',currency:cur,type,address:addr,threshold:10};
   if(pass) data.adminPassword=pass;
-  // Show saving indicator
-  ferr('bm-err','Saving...');
-  g('bm-err').style.background='#EFF6FF';g('bm-err').style.color='#1D4ED8';g('bm-err').style.borderColor='#BFDBFE';
   try{
+    let newBuyerId = eid;
     if(eid){
       await db.collection('buyers').doc(eid).update(data);
-      g('bm-err').classList.add('h');
       closeM('buyer-modal'); toast('Buyer updated!','s');
     } else {
       const ref = await db.collection('buyers').add({...data,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-      g('bm-err').classList.add('h');
+      newBuyerId = ref.id;
       closeM('buyer-modal');
-      toast('Buyer created! 🎉','s');
-      await loadBuyers();
-      renderBuyers();
-      setTimeout(()=>enterBuyer(ref.id), 800);
+      toast('Buyer created! 🎉 Entering inventory…','s');
+      // Auto-enter the new buyer so SA can immediately add products/staff
+      setTimeout(()=>enterBuyer(newBuyerId), 800);
     }
-  }catch(e){
-    g('bm-err').style.background='';g('bm-err').style.color='';g('bm-err').style.borderColor='';
-    ferr('bm-err','ERROR: '+e.message+' (code:'+e.code+')');
-    alert('Save failed: '+e.message);
-  }
+  }catch(e){ferr('bm-err','Failed: '+e.message);}
 }
 async function deleteBuyer(id,name){
   if(!confirm('Delete buyer "'+name+'"? ALL their data will be deleted permanently!'))return;
@@ -1903,13 +1879,13 @@ let CUSTOMERS = [];
 let CUST_UNSUB = null;
 
 async function subscribeCustomers(){
-  const b = BID||ME?.buyerId; if(!b) return;
+  const b=BID||ME?.buyerId; if(!b) return;
   try{
-    const snap = await db.collection('buyers').doc(b).collection('customers').get();
-    CUSTOMERS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const snap=await db.collection('buyers').doc(b).collection('customers').get();
+    CUSTOMERS=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(g('pg-customers')?.classList.contains('on')) renderCustomers();
     populateCustDl();
-  }catch(e){ console.warn('customers:',e.message); }
+  }catch(e){console.warn('customers:',e.message);}
 }
 
 function populateCustDl(){
