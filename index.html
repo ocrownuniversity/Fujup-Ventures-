@@ -901,7 +901,6 @@ tbody tr:hover{background:var(--bg)}
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <script>
@@ -921,7 +920,6 @@ const FB = {
 };
 firebase.initializeApp(FB);
 const db  = firebase.firestore();
-const auth= firebase.auth();
 
 // ── SUPER ADMIN PIN (stored in Firestore) ──────────
 const SA_PIN_DEFAULT = '1990';
