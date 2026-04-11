@@ -1037,42 +1037,36 @@ async function doLogin(){
   g('login-btn').disabled=true;
 
   try {
-    // First: check if email matches a buyer admin directly (no index needed)
-    const buyerAdminSnap = await db.collection('buyers').where('adminEmail','==',email).get();
-    if(!buyerAdminSnap.empty){
-      const bdoc = buyerAdminSnap.docs[0];
-      const bd   = bdoc.data();
-      if(bd.adminPassword === pass){
-        BID = bdoc.id;
-        ME  = {id:'admin-'+BID, name:bd.adminName||'Admin', role:'admin', email:bd.adminEmail, buyerId:BID};
-        CFG = {bizName:bd.name, currency:bd.currency||'$', threshold:bd.threshold||10, address:bd.address||''};
-        show('app'); setupApp(); return;
-      } else {
-        throw new Error('Wrong password');
-      }
-    }
-
-    // Second: search staff within each buyer (avoids collectionGroup index requirement)
+    // Fetch all buyers — match admin email/password OR staff email/password in JS (no index needed)
     const buyersSnap = await db.collection('buyers').get();
-    let found = null, foundBID = null;
+    let foundBID = null, foundMe = null;
+
     for(const bDoc of buyersSnap.docs){
-      const staffSnap = await bDoc.ref.collection('staff').where('email','==',email).get();
-      if(!staffSnap.empty){
-        const su = staffSnap.docs[0].data();
-        if(su.password === pass){
-          found    = {id:staffSnap.docs[0].id, ...su};
+      const bd = bDoc.data();
+      // Check if this is the buyer admin
+      if(bd.adminEmail && bd.adminEmail.toLowerCase()===email && bd.adminPassword===pass){
+        foundBID = bDoc.id;
+        CFG = {bizName:bd.name, currency:bd.currency||'$', threshold:bd.threshold||10, address:bd.address||''};
+        foundMe = {id:'admin-'+bDoc.id, name:bd.adminName||'Admin', role:'admin', email:bd.adminEmail, buyerId:bDoc.id};
+        break;
+      }
+      // Check staff under this buyer
+      const staffSnap = await bDoc.ref.collection('staff').get();
+      for(const sd of staffSnap.docs){
+        const su = sd.data();
+        if(su.email && su.email.toLowerCase()===email && su.password===pass){
           foundBID = bDoc.id;
-          // Also get buyer config
-          const bd = bDoc.data();
           CFG = {bizName:bd.name, currency:bd.currency||'$', threshold:bd.threshold||10, address:bd.address||''};
+          foundMe = {id:sd.id, name:su.name, role:su.role, email:su.email, buyerId:bDoc.id};
           break;
         }
       }
+      if(foundBID) break;
     }
 
-    if(!found){ throw new Error('Invalid email or password'); }
+    if(!foundBID){ throw new Error('Invalid email or password'); }
     BID = foundBID;
-    ME  = {id:found.id, name:found.name, role:found.role, email:found.email, buyerId:BID};
+    ME  = foundMe;
     show('app'); setupApp();
 
   } catch(e){
@@ -1783,7 +1777,6 @@ async function saveBuyer(){
   if(!eid&&!pass)return ferr('bm-err','Admin password required.');
   if(pass&&pass.length<6)return ferr('bm-err','Password must be 6+ chars.');
   if(pin&&!/^\d{4}$/.test(pin))return ferr('bm-err','PIN must be 4 digits.');
-
   const data={name,adminEmail:email,adminName:'Admin',pin:pin||'',currency:cur,type,address:addr,threshold:10};
   if(pass) data.adminPassword=pass;
   try{
@@ -1824,7 +1817,6 @@ async function changePIN(){
   if(old!==(buyer.pin||''))return toast('Current PIN is incorrect','e');
   if(!/^\d{4}$/.test(nw))return toast('PIN must be 4 digits','e');
   if(nw!==cf)return toast('PINs do not match','e');
-
   try{await db.collection('buyers').doc(BID).update({pin:nw});g('s-old').value='';g('s-new').value='';g('s-cf').value='';toast('PIN updated!','s');}catch(e){toast('Failed: '+e.message,'e');}
 }
 
