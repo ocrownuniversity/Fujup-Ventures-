@@ -912,12 +912,12 @@ tbody tr:hover{background:var(--bg)}
 
 // ── FIREBASE CONFIG ────────────────────────────────
 const FB = {
-  apiKey:"AIzaSyBTrOdY_83Hc4wjBrqq4IRDvuQ4tGclMYE",
-  authDomain:"fujup-venture.firebaseapp.com",
-  projectId:"fujup-venture",
-  storageBucket:"fujup-venture.firebasestorage.app",
-  messagingSenderId:"632092255344",
-  appId:"1:632092255344:web:7d45f5e7c8a776290900b5"
+  apiKey:"AIzaSyCuTK8-gtJDFxUD8f2YOKgG54xPebKEfmg",
+  authDomain:"fujup-ventures.firebaseapp.com",
+  projectId:"fujup-ventures",
+  storageBucket:"fujup-ventures.firebasestorage.app",
+  messagingSenderId:"77667389516",
+  appId:"1:77667389516:web:8ed5fcf7e015c9776f64e9"
 };
 firebase.initializeApp(FB);
 const db  = firebase.firestore();
@@ -1011,7 +1011,6 @@ function pdel(){ pBuf=pBuf.slice(0,-1); pDots(); g('pin-err').classList.add('h')
 function pDots(){ for(let i=0;i<4;i++){const e=g('d'+i);if(!e)return;e.className='pd'+(i<pBuf.length?' on':'');} }
 async function pCheck(){
   try{
-    // Fetch all buyers and match PIN in JS — no Firestore index required
     const snap = await db.collection('buyers').get();
     const buyer = snap.docs.map(d=>({id:d.id,...d.data()})).find(b=>String(b.pin||'')=== pBuf);
     if(buyer){
@@ -1784,7 +1783,7 @@ async function saveBuyer(){
   if(!eid&&!pass)return ferr('bm-err','Admin password required.');
   if(pass&&pass.length<6)return ferr('bm-err','Password must be 6+ chars.');
   if(pin&&!/^\d{4}$/.test(pin))return ferr('bm-err','PIN must be 4 digits.');
-  // PIN duplicate check removed — .where() query requires Firestore index
+
   const data={name,adminEmail:email,adminName:'Admin',pin:pin||'',currency:cur,type,address:addr,threshold:10};
   if(pass) data.adminPassword=pass;
   try{
@@ -1825,7 +1824,7 @@ async function changePIN(){
   if(old!==(buyer.pin||''))return toast('Current PIN is incorrect','e');
   if(!/^\d{4}$/.test(nw))return toast('PIN must be 4 digits','e');
   if(nw!==cf)return toast('PINs do not match','e');
-  // PIN duplicate check removed — .where() query requires Firestore index
+
   try{await db.collection('buyers').doc(BID).update({pin:nw});g('s-old').value='';g('s-new').value='';g('s-cf').value='';toast('PIN updated!','s');}catch(e){toast('Failed: '+e.message,'e');}
 }
 
