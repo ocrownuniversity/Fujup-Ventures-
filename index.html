@@ -1118,30 +1118,33 @@ function applyRoleNav(){
 function subscribeData(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
   if(SA_MODE && !BID){
-    // SA: load all buyers
     const u1 = db.collection('buyers').onSnapshot(snap=>{
       BUYERS = snap.docs.map(d=>({id:d.id,...d.data()}));
       if(document.getElementById('pg-buyers')?.classList.contains('on')) renderBuyers();
       if(document.getElementById('pg-dashboard')?.classList.contains('on')) renderDash();
-    });
+    }, err=>console.warn('buyers:',err));
     UNSUBS=[u1];
   } else if(BID){
     const base = db.collection('buyers').doc(BID);
-    const u1 = base.collection('products').orderBy('dateAdded','desc').onSnapshot(snap=>{
+    const u1 = base.collection('products').onSnapshot(snap=>{
       PRODS = snap.docs.map(d=>({id:d.id,...d.data()}));
+      PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
       if(g('pg-products')?.classList.contains('on')) renderProds();
       if(g('pg-dashboard')?.classList.contains('on')) renderDash();
       checkLowStock();
     }, err=>console.warn('products:',err));
-    const u2 = base.collection('sales').orderBy('timestamp','desc').onSnapshot(snap=>{
+    const u2 = base.collection('sales').onSnapshot(snap=>{
       SALES = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
+      SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
       if(g('pg-sales')?.classList.contains('on')) renderSales();
       if(g('pg-dashboard')?.classList.contains('on')) renderDash();
       if(g('pg-reports')?.classList.contains('on')) renderRpt();
       updBadges();
     }, err=>console.warn('sales:',err));
-    const u3 = base.collection('notifications').orderBy('time','desc').limit(50).onSnapshot(snap=>{
+    const u3 = base.collection('notifications').onSnapshot(snap=>{
       NOTIFS = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
+      NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
+      if(NOTIFS.length>50) NOTIFS=NOTIFS.slice(0,50);
       if(g('pg-alerts')?.classList.contains('on')) renderNotifs();
       updBadges();
     }, err=>console.warn('notifs:',err));
@@ -1889,7 +1892,6 @@ function subscribeCustomers(){
   const b = BID||ME?.buyerId; if(!b) return;
   if(CUST_UNSUB) CUST_UNSUB();
   CUST_UNSUB = db.collection('buyers').doc(b).collection('customers')
-    .orderBy('name','asc')
     .onSnapshot(snap=>{
       CUSTOMERS = snap.docs.map(d=>({id:d.id,...d.data()}));
       if(g('pg-customers')?.classList.contains('on')) renderCustomers();
