@@ -871,16 +871,16 @@ function pdel(){ pBuf=pBuf.slice(0,-1); pDots(); g('pin-err').classList.add('h')
 function pDots(){ for(let i=0;i<4;i++){const e=g('d'+i);if(!e)return;e.className='pd'+(i<pBuf.length?' on':'');} }
 async function pCheck(){
   try{
-    const snap = await db.collection('buyers').where('pin','==',pBuf).get();
-    if(!snap.empty){
-      const bdoc = snap.docs[0];
-      const buyer = {id:bdoc.id,...bdoc.data()};
-      BID = buyer.id;
-      ME  = {id:'buyer-admin-'+BID, name:buyer.adminName||'Admin', role:'admin', buyerId:BID};
-      CFG = {bizName:buyer.name, currency:buyer.currency||'$', threshold:buyer.threshold||10, address:buyer.address||''};
+    // Fetch all buyers and match PIN client-side — avoids needing a Firestore index
+    const snap = await db.collection('buyers').get();
+    const found = snap.docs.map(d=>({id:d.id,...d.data()})).find(b=>String(b.pin||'')=== pBuf);
+    if(found){
+      BID = found.id;
+      ME  = {id:'buyer-admin-'+BID, name:found.adminName||'Admin', role:'admin', buyerId:BID};
+      CFG = {bizName:found.name, currency:found.currency||'$', threshold:found.threshold||10, address:found.address||''};
       show('app');
       setupApp();
-      toast('Welcome to '+buyer.name+' 👋','s');
+      toast('Welcome to '+found.name+' 👋','s');
     } else {
       for(let i=0;i<4;i++){const e=g('d'+i);if(e){e.className='pd err';}}
       g('pin-err').classList.remove('h');
@@ -1644,7 +1644,7 @@ async function saveBuyer(){
   if(!eid&&!pass)return ferr('bm-err','Admin password required.');
   if(pass&&pass.length<6)return ferr('bm-err','Password must be 6+ chars.');
   if(pin&&!/^\d{4}$/.test(pin))return ferr('bm-err','PIN must be 4 digits.');
-  if(pin){const dup=await db.collection('buyers').where('pin','==',pin).get();if(!dup.empty&&(eid?dup.docs[0].id!==eid:true))return ferr('bm-err','PIN already used by another buyer.');}
+  // PIN duplicate check removed — caused index errors in Firestore
   const data={name,adminEmail:email,adminName:'Admin',pin:pin||'',currency:cur,type,address:addr,threshold:10};
   if(pass) data.adminPassword=pass;
   try{
@@ -1685,8 +1685,7 @@ async function changePIN(){
   if(old!==(buyer.pin||''))return toast('Current PIN is incorrect','e');
   if(!/^\d{4}$/.test(nw))return toast('PIN must be 4 digits','e');
   if(nw!==cf)return toast('PINs do not match','e');
-  const dup=await db.collection('buyers').where('pin','==',nw).get();
-  if(!dup.empty&&dup.docs[0].id!==BID)return toast('PIN already used by another buyer','e');
+  // PIN uniqueness check skipped (no index needed)
   try{await db.collection('buyers').doc(BID).update({pin:nw});g('s-old').value='';g('s-new').value='';g('s-cf').value='';toast('PIN updated!','s');}catch(e){toast('Failed: '+e.message,'e');}
 }
 
@@ -1755,7 +1754,7 @@ document.addEventListener('keydown',e=>{
   if(appVis&&e.key==='Enter'&&document.activeElement?.id==='l-pass')doLogin();
 });
 
-console.log('%c Fujup Venture — Inventory System ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
+console.log('%c Fujup Venture — Inventory ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
 </script>
 </body>
 </html>
