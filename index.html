@@ -1096,8 +1096,9 @@ function setupApp(){
   // SA settings card
   if(SA_MODE && !BID){ g('sa-pin-card')?.classList.remove('h'); g('pin-change-card')?.classList.add('h'); }
   // Subscribe to Firestore
-  subscribeData();
-  if(SA_MODE && !BID){ nav('buyers'); } else { nav('dashboard'); }
+  subscribeData().then(()=>{
+    if(SA_MODE && !BID){ nav('buyers'); } else { nav('dashboard'); }
+  });
 }
 
 function applyRoleNav(){
@@ -1115,45 +1116,50 @@ function applyRoleNav(){
 }
 
 // ── FIRESTORE SUBSCRIPTIONS ────────────────────────
-function subscribeData(){
+async function subscribeData(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
   if(SA_MODE && !BID){
-    const u1 = db.collection('buyers').onSnapshot(snap=>{
-      BUYERS = snap.docs.map(d=>({id:d.id,...d.data()}));
-      if(document.getElementById('pg-buyers')?.classList.contains('on')) renderBuyers();
-      if(document.getElementById('pg-dashboard')?.classList.contains('on')) renderDash();
-    }, err=>console.warn('buyers:',err));
-    UNSUBS=[u1];
+    await loadBuyers();
   } else if(BID){
-    const base = db.collection('buyers').doc(BID);
-    const u1 = base.collection('products').onSnapshot(snap=>{
-      PRODS = snap.docs.map(d=>({id:d.id,...d.data()}));
-      PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
-      if(g('pg-products')?.classList.contains('on')) renderProds();
-      if(g('pg-dashboard')?.classList.contains('on')) renderDash();
-      checkLowStock();
-    }, err=>console.warn('products:',err));
-    const u2 = base.collection('sales').onSnapshot(snap=>{
-      SALES = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
-      SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
-      if(g('pg-sales')?.classList.contains('on')) renderSales();
-      if(g('pg-dashboard')?.classList.contains('on')) renderDash();
-      if(g('pg-reports')?.classList.contains('on')) renderRpt();
-      updBadges();
-    }, err=>console.warn('sales:',err));
-    const u3 = base.collection('notifications').onSnapshot(snap=>{
-      NOTIFS = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
-      NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
-      if(NOTIFS.length>50) NOTIFS=NOTIFS.slice(0,50);
-      if(g('pg-alerts')?.classList.contains('on')) renderNotifs();
-      updBadges();
-    }, err=>console.warn('notifs:',err));
-    const u4 = base.collection('staff').onSnapshot(snap=>{
-      STAFF = snap.docs.map(d=>({id:d.id,...d.data()}));
-      if(g('pg-staff')?.classList.contains('on')) renderStaff();
-    }, err=>console.warn('staff:',err));
-    UNSUBS=[u1,u2,u3,u4];
+    await loadBranchData();
+    // Poll every 10 seconds to keep data fresh
+    const t = setInterval(loadBranchData, 10000);
+    UNSUBS=[()=>clearInterval(t)];
   }
+}
+
+async function loadBuyers(){
+  try{
+    const snap = await db.collection('buyers').get();
+    BUYERS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(document.getElementById('pg-buyers')?.classList.contains('on')) renderBuyers();
+    if(document.getElementById('pg-dashboard')?.classList.contains('on')) renderDash();
+  }catch(e){ console.warn('loadBuyers:',e.message); }
+}
+
+async function loadBranchData(){
+  try{
+    const base = db.collection('buyers').doc(BID);
+    const [p,s,n,st] = await Promise.all([
+      base.collection('products').get(),
+      base.collection('sales').get(),
+      base.collection('notifications').get(),
+      base.collection('staff').get()
+    ]);
+    PRODS = p.docs.map(d=>({id:d.id,...d.data()}));
+    PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
+    SALES = s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
+    SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+    NOTIFS = n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
+    NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
+    NOTIFS = NOTIFS.slice(0,50);
+    STAFF = st.docs.map(d=>({id:d.id,...d.data()}));
+    // Refresh current page
+    const cur = document.querySelector('.pg.on')?.id?.replace('pg-','');
+    const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff};
+    if(cur&&map[cur]) map[cur]();
+    updBadges(); checkLowStock();
+  }catch(e){ console.warn('loadBranchData:',e.message); }
 }
 
 // ── NAVIGATION ─────────────────────────────────────
@@ -1755,7 +1761,7 @@ async function enterBuyer(bid){
   if(g('set-cur')) g('set-cur').value=CFG.currency;
   if(g('set-thr')) g('set-thr').value=CFG.threshold;
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
-  subscribeData();
+  await subscribeData();
   nav('dashboard');
   toast('Entered '+buyer.name+' as Admin','s');
 }
@@ -1888,15 +1894,14 @@ document.addEventListener('keydown',e=>{
 let CUSTOMERS = [];
 let CUST_UNSUB = null;
 
-function subscribeCustomers(){
+async function subscribeCustomers(){
   const b = BID||ME?.buyerId; if(!b) return;
-  if(CUST_UNSUB) CUST_UNSUB();
-  CUST_UNSUB = db.collection('buyers').doc(b).collection('customers')
-    .onSnapshot(snap=>{
-      CUSTOMERS = snap.docs.map(d=>({id:d.id,...d.data()}));
-      if(g('pg-customers')?.classList.contains('on')) renderCustomers();
-      populateCustDl();
-    }, e=>console.warn('customers:',e));
+  try{
+    const snap = await db.collection('buyers').doc(b).collection('customers').get();
+    CUSTOMERS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(g('pg-customers')?.classList.contains('on')) renderCustomers();
+    populateCustDl();
+  }catch(e){ console.warn('customers:',e.message); }
 }
 
 function populateCustDl(){
