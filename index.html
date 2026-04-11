@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Fujup Venture — Inventory</title>
+<title>Fujup Venture</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -906,7 +906,7 @@ tbody tr:hover{background:var(--bg)}
 <script>
 'use strict';
 // ══════════════════════════════════════════════════════
-//  FUJUP VENTURE — Inventory Management System
+//  STOCKPILOT PRO — Firebase Multi-Buyer System
 // ══════════════════════════════════════════════════════
 
 // ── FIREBASE CONFIG ────────────────────────────────
@@ -973,15 +973,13 @@ function applyDark(){ document.documentElement.toggleAttribute('data-dark',DARK)
 function toggleDark(){ DARK=!DARK; localStorage.setItem('sp_dark',DARK?'1':'0'); applyDark(); }
 applyDark();
 
-// ── INIT ──────────────────────────────────────────
+// ── INIT: LOAD SA PIN FROM FIRESTORE ──────────────
 function initApp(){
-  // Show login screen immediately — do NOT wait for Firebase
   g('loading').classList.add('h');
   show('lock-screen');
-  // Load SA PIN in background quietly
   db.collection('system').doc('config').get()
-    .then(doc=>{ if(doc.exists && doc.data().sa_pin) SA_PIN = doc.data().sa_pin; })
-    .catch(e=>{ console.warn('SA pin:', e.message); });
+    .then(d=>{ if(d.exists&&d.data().sa_pin) SA_PIN=d.data().sa_pin; })
+    .catch(()=>{});
 }
 initApp();
 
@@ -1036,36 +1034,31 @@ async function doLogin(){
   g('login-btn').disabled=true;
 
   try {
-    // Fetch all buyers — match admin email/password OR staff email/password in JS (no index needed)
-    const buyersSnap = await db.collection('buyers').get();
+    // First: check if email matches a buyer admin directly (no index needed)
+    const allBuyers = await db.collection('buyers').get();
     let foundBID = null, foundMe = null;
-
-    for(const bDoc of buyersSnap.docs){
+    for(const bDoc of allBuyers.docs){
       const bd = bDoc.data();
-      // Check if this is the buyer admin
-      if(bd.adminEmail && bd.adminEmail.toLowerCase()===email && bd.adminPassword===pass){
-        foundBID = bDoc.id;
-        CFG = {bizName:bd.name, currency:bd.currency||'$', threshold:bd.threshold||10, address:bd.address||''};
-        foundMe = {id:'admin-'+bDoc.id, name:bd.adminName||'Admin', role:'admin', email:bd.adminEmail, buyerId:bDoc.id};
+      if(bd.adminEmail&&bd.adminEmail.toLowerCase()===email&&bd.adminPassword===pass){
+        foundBID=bDoc.id;
+        CFG={bizName:bd.name,currency:bd.currency||'$',threshold:bd.threshold||10,address:bd.address||''};
+        foundMe={id:'admin-'+bDoc.id,name:bd.adminName||'Admin',role:'admin',email:bd.adminEmail,buyerId:bDoc.id};
         break;
       }
-      // Check staff under this buyer
       const staffSnap = await bDoc.ref.collection('staff').get();
       for(const sd of staffSnap.docs){
-        const su = sd.data();
-        if(su.email && su.email.toLowerCase()===email && su.password===pass){
-          foundBID = bDoc.id;
-          CFG = {bizName:bd.name, currency:bd.currency||'$', threshold:bd.threshold||10, address:bd.address||''};
-          foundMe = {id:sd.id, name:su.name, role:su.role, email:su.email, buyerId:bDoc.id};
+        const su=sd.data();
+        if(su.email&&su.email.toLowerCase()===email&&su.password===pass){
+          foundBID=bDoc.id;
+          CFG={bizName:bd.name,currency:bd.currency||'$',threshold:bd.threshold||10,address:bd.address||''};
+          foundMe={id:sd.id,name:su.name,role:su.role,email:su.email,buyerId:bDoc.id};
           break;
         }
       }
       if(foundBID) break;
     }
-
     if(!foundBID){ throw new Error('Invalid email or password'); }
-    BID = foundBID;
-    ME  = foundMe;
+    BID=foundBID; ME=foundMe;
     show('app'); setupApp();
 
   } catch(e){
@@ -2506,7 +2499,7 @@ applyRoleNav=function(){
 
 
 
-console.log('%c Fujup Venture — Inventory ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
+console.log('%c Fujup Venture ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
 </script>
 </body>
 </html>
