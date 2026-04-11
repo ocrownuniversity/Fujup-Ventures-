@@ -376,25 +376,44 @@ tbody tr:hover{background:var(--bg)}
 <div class="screen screen-bg" id="lock-screen">
   <div class="lcard">
     <div class="llogo"><div class="llogo-icon">📦</div><div class="llogo-text">Fujup<span> Ventures</span></div></div>
-    <div class="ltitle">Welcome back</div>
-    <div class="lsub">Enter your 4-digit PIN to continue</div>
-    <div class="pin-dots"><div class="pd" id="d0"></div><div class="pd" id="d1"></div><div class="pd" id="d2"></div><div class="pd" id="d3"></div></div>
-    <div id="pin-err" class="errbox h">❌ Wrong PIN. Try again.</div>
-    <div class="numpad">
-      <button class="nk" onclick="pk('1')">1</button><button class="nk" onclick="pk('2')">2</button><button class="nk" onclick="pk('3')">3</button>
-      <button class="nk" onclick="pk('4')">4</button><button class="nk" onclick="pk('5')">5</button><button class="nk" onclick="pk('6')">6</button>
-      <button class="nk" onclick="pk('7')">7</button><button class="nk" onclick="pk('8')">8</button><button class="nk" onclick="pk('9')">9</button>
-      <button class="nk" style="grid-column:span 2" onclick="pk('0')">0</button>
-      <button class="nk" onclick="pdel()">⌫</button>
+    <!-- Tabs -->
+    <div class="ltabs">
+      <div class="ltab on" id="t-pin" onclick="switchTab('pin')">🔑 Admin PIN</div>
+      <div class="ltab" id="t-login" onclick="switchTab('login')">👤 Staff Login</div>
     </div>
+
+    <!-- ── Admin PIN panel ── -->
+    <div id="f-pin">
+      <div class="ltitle">Admin Access</div>
+      <div class="lsub">Enter your 4-digit PIN to continue</div>
+      <div class="pin-dots"><div class="pd" id="d0"></div><div class="pd" id="d1"></div><div class="pd" id="d2"></div><div class="pd" id="d3"></div></div>
+      <div id="pin-err" class="errbox h">❌ Wrong PIN. Try again.</div>
+      <div class="numpad">
+        <button class="nk" onclick="pk('1')">1</button><button class="nk" onclick="pk('2')">2</button><button class="nk" onclick="pk('3')">3</button>
+        <button class="nk" onclick="pk('4')">4</button><button class="nk" onclick="pk('5')">5</button><button class="nk" onclick="pk('6')">6</button>
+        <button class="nk" onclick="pk('7')">7</button><button class="nk" onclick="pk('8')">8</button><button class="nk" onclick="pk('9')">9</button>
+        <button class="nk" style="grid-column:span 2" onclick="pk('0')">0</button>
+        <button class="nk" onclick="pdel()">⌫</button>
+      </div>
+    </div>
+
+    <!-- ── Staff Login panel ── -->
+    <div id="f-login" class="h">
+      <div class="ltitle">Staff Login</div>
+      <div class="lsub">Sign in with your staff credentials</div>
+      <div id="login-err" class="errbox h"></div>
+      <div class="fg"><label class="fl">Email</label><input class="fi" type="email" id="l-email" placeholder="staff@fujupventures.com"/></div>
+      <div class="fg"><label class="fl">Password</label>
+        <div class="pw-w"><input class="fi" type="password" id="l-pass" placeholder="Password"/><span class="pw-eye" onclick="tpw('l-pass')">👁</span></div>
+      </div>
+      <button class="btn-pri" id="login-btn" onclick="doLogin()">Sign In →</button>
+    </div>
+
     <div class="lfoot"><span class="pdot"></span>Firebase Sync · Secured</div>
   </div>
 </div>
 <!-- Hidden stubs so JS refs don't break -->
 <div id="sa-screen" class="h" style="display:none!important"></div>
-<div id="l-email" style="display:none"></div>
-<div id="l-pass" style="display:none"></div>
-<div id="login-err" class="h" style="display:none"></div>
 <div id="sa-pin-err" class="h" style="display:none"></div>
 
 <!-- ══ MAIN APP ══ -->
@@ -939,16 +958,21 @@ applyDark();
 
 // ── INIT: LOAD PIN FROM FIRESTORE ─────────────────
 async function initApp(){
+  // Restore cached PIN immediately so login works even if Firestore is slow
+  const cached = localStorage.getItem('fv_app_pin');
+  if(cached) APP_PIN = cached;
   try {
     const doc = await db.collection('system').doc('config').get();
-    if(doc.exists && doc.data().app_pin) APP_PIN = doc.data().app_pin;
-    // Also load CFG for Fujup Ventures
+    if(doc.exists && doc.data().app_pin){
+      APP_PIN = doc.data().app_pin;
+      localStorage.setItem('fv_app_pin', APP_PIN);
+    }
+    // Load or create the Fujup Ventures buyer document
     const bdoc = await db.collection('buyers').doc(FUJUP_BID).get();
     if(bdoc.exists){
       const bd = bdoc.data();
       CFG = {bizName:bd.name||'Fujup Ventures', currency:bd.currency||'₦', threshold:bd.threshold||10, address:bd.address||''};
     } else {
-      // Auto-create the buyer document if it doesn't exist yet
       await db.collection('buyers').doc(FUJUP_BID).set({
         name:'Fujup Ventures', currency:'₦', threshold:10, address:'', pin:'', adminName:'Admin', adminEmail:'', type:'shop',
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -983,8 +1007,31 @@ async function pCheck(){
   }
 }
 
-// ── STAFF EMAIL LOGIN (stub — single user uses PIN) ─
-async function doLogin(){ toast('Use the PIN to log in','w'); }
+// ── STAFF EMAIL LOGIN ──────────────────────────────
+async function doLogin(){
+  const email = g('l-email').value.trim().toLowerCase();
+  const pass  = g('l-pass').value;
+  if(!email||!pass) return ferr('login-err','Fill in all fields.');
+  const btn = g('login-btn');
+  btn.innerHTML='<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div>';
+  btn.disabled=true;
+  try{
+    const staffSnap = await db.collection('buyers').doc(FUJUP_BID).collection('staff')
+      .where('email','==',email).get();
+    if(staffSnap.empty) throw new Error('No staff account found for that email.');
+    const su = staffSnap.docs[0].data();
+    if(su.password !== pass) throw new Error('Incorrect password.');
+    BID = FUJUP_BID;
+    ME  = {id:staffSnap.docs[0].id, name:su.name, role:su.role, email:su.email, buyerId:FUJUP_BID};
+    show('app'); setupApp();
+    toast('Welcome, '+su.name+' 👋','s');
+  } catch(e){
+    ferr('login-err', e.message||'Login failed.');
+  } finally {
+    btn.innerHTML='Sign In →';
+    btn.disabled=false;
+  }
+}
 
 // ── SETUP APP ──────────────────────────────────────
 function setupApp(){
@@ -1028,12 +1075,32 @@ function applyRoleNav(){
 function subscribeData(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
   const base = db.collection('buyers').doc(FUJUP_BID);
-  const u1 = base.collection('products').orderBy('dateAdded','desc').onSnapshot(snap=>{
+
+  // Products — try ordered, fall back to unordered if index missing
+  let u1;
+  const prodsHandler = snap => {
     PRODS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    // client-side sort: docs with dateAdded first (newest), then the rest
+    PRODS.sort((a,b)=>{
+      const ta = a.dateAdded?.toDate?.()?.getTime() || a.dateAdded || 0;
+      const tb = b.dateAdded?.toDate?.()?.getTime() || b.dateAdded || 0;
+      return tb - ta;
+    });
     if(g('pg-products')?.classList.contains('on')) renderProds();
     if(g('pg-dashboard')?.classList.contains('on')) renderDash();
     checkLowStock();
-  }, err=>console.warn('products:',err));
+  };
+  try {
+    u1 = base.collection('products').orderBy('dateAdded','desc').onSnapshot(prodsHandler, err=>{
+      console.warn('products ordered query failed, falling back:', err.message);
+      // fallback: unordered snapshot
+      u1 = base.collection('products').onSnapshot(prodsHandler, err2=>console.warn('products:', err2));
+      UNSUBS[0] = u1;
+    });
+  } catch(e) {
+    u1 = base.collection('products').onSnapshot(prodsHandler, err=>console.warn('products:', err));
+  }
+
   const u2 = base.collection('sales').orderBy('timestamp','desc').onSnapshot(snap=>{
     SALES = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
     if(g('pg-sales')?.classList.contains('on')) renderSales();
@@ -1041,15 +1108,18 @@ function subscribeData(){
     if(g('pg-reports')?.classList.contains('on')) renderRpt();
     updBadges();
   }, err=>console.warn('sales:',err));
+
   const u3 = base.collection('notifications').orderBy('time','desc').limit(50).onSnapshot(snap=>{
     NOTIFS = snap.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
     if(g('pg-alerts')?.classList.contains('on')) renderNotifs();
     updBadges();
   }, err=>console.warn('notifs:',err));
+
   const u4 = base.collection('staff').onSnapshot(snap=>{
     STAFF = snap.docs.map(d=>({id:d.id,...d.data()}));
     if(g('pg-staff')?.classList.contains('on')) renderStaff();
   }, err=>console.warn('staff:',err));
+
   UNSUBS=[u1,u2,u3,u4];
 }
 
@@ -1071,10 +1141,13 @@ function closeSB(){ g('sidebar').classList.remove('open'); g('sb-ovl').classList
 // ── LOGOUT ─────────────────────────────────────────
 function logout(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
+  if(typeof CUST_UNSUB==='function'){ CUST_UNSUB(); CUST_UNSUB=null; }
   ME=null; BID=null; SA_MODE=false;
   PRODS=[]; SALES=[]; NOTIFS=[]; STAFF=[]; BUYERS=[];
+  if(typeof CUSTOMERS!=='undefined') CUSTOMERS=[];
   pBuf=''; pDots();
   show('lock-screen');
+  switchTab('pin');
 }
 
 function exitCtx(){ /* stub — no multi-buyer context in single-user */ }
@@ -1641,6 +1714,7 @@ async function changePIN(){
   try{
     await db.collection('system').doc('config').set({app_pin:nw},{merge:true});
     APP_PIN=nw;
+    localStorage.setItem('fv_app_pin', nw);
     g('s-old').value=''; g('s-new').value=''; g('s-cf').value='';
     toast('PIN updated!','s');
   }catch(e){toast('Failed: '+e.message,'e');}
@@ -1691,13 +1765,23 @@ window.addEventListener('resize',()=>{ adjGrids(); if(g('pg-dashboard')?.classLi
 adjGrids();
 
 // ── LOCK TAB SWITCH ────────────────────────────────
-function switchTab(t){ /* stub — no tabs in single-user mode */ }
+function switchTab(t){
+  g('t-pin').classList.toggle('on', t==='pin');
+  g('t-login').classList.toggle('on', t==='login');
+  g('f-pin').classList.toggle('h', t!=='pin');
+  g('f-login').classList.toggle('h', t!=='login');
+  g('login-err').classList.add('h');
+  g('pin-err').classList.add('h');
+  pBuf=''; pDots();
+}
 
 // ── KEYBOARD ──────────────────────────────────────
 document.addEventListener('keydown',e=>{
-  const pinVis=!g('lock-screen').classList.contains('h');
+  const pinVis=!g('lock-screen').classList.contains('h') && !g('f-pin').classList.contains('h');
   if(pinVis){if(e.key>='0'&&e.key<='9')pk(e.key);if(e.key==='Backspace')pdel();}
   if(e.key==='Escape'){['prod-modal','sale-modal','del-modal','stock-modal','staff-modal','buyer-modal','rcpt-modal'].forEach(closeM);closeSB();}
+  const loginVis=!g('lock-screen').classList.contains('h') && !g('f-login').classList.contains('h');
+  if(loginVis&&e.key==='Enter') doLogin();
 });
 
 // ═══════════════════════════════════════════════════════
