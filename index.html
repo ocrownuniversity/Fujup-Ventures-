@@ -554,8 +554,8 @@ tbody tr:hover{background:var(--bg)}
       </div>
       <div class="sg" style="grid-template-columns:repeat(4,1fr)">
         <div class="sc"><div><div class="label">Sales</div><div class="value" id="rpt-s">0</div></div></div>
-        <div class="sc"><div><div class="label">Revenue</div><div class="value" id="rpt-r">$0</div></div></div>
-        <div class="sc"><div><div class="label">Avg Order</div><div class="value" id="rpt-a">$0</div></div></div>
+        <div class="sc"><div><div class="label">Revenue</div><div class="value" id="rpt-r">₦0</div></div></div>
+        <div class="sc"><div><div class="label">Avg Order</div><div class="value" id="rpt-a">₦0</div></div></div>
         <div class="sc"><div><div class="label">Units Sold</div><div class="value" id="rpt-u">0</div></div></div>
       </div>
       <div id="rpt-grid" style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
@@ -606,7 +606,7 @@ tbody tr:hover{background:var(--bg)}
         <div class="sc"><div class="sc-icon" style="background:#EDE9FE">🏢</div><div><div class="label">Total Branches</div><div class="value" id="sa-b">0</div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#EFF6FF">📦</div><div><div class="label">All Products</div><div class="value" id="sa-p">0</div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#F0FDF4">💳</div><div><div class="label">All Sales</div><div class="value" id="sa-s">0</div></div></div>
-        <div class="sc"><div class="sc-icon" style="background:#FFFBEB">💰</div><div><div class="label">All Revenue</div><div class="value" id="sa-r">$0</div></div></div>
+        <div class="sc"><div class="sc-icon" style="background:#FFFBEB">💰</div><div><div class="label">All Revenue</div><div class="value" id="sa-r">₦0</div></div></div>
       </div>
       <div id="buyers-grid" class="sg-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px"></div>
     </div>
@@ -756,14 +756,14 @@ tbody tr:hover{background:var(--bg)}
       <!-- Totals -->
       <div style="border:1px solid var(--bord);border-radius:10px;overflow:hidden">
         <div style="display:flex;justify-content:space-between;padding:9px 14px;font-size:.84rem;color:var(--t3);border-bottom:1px solid var(--bord)">
-          <span>Subtotal</span><span id="cart-subtotal">$0.00</span>
+          <span>Subtotal</span><span id="cart-subtotal">₦0.00</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding:9px 14px;font-size:.84rem;color:#DC2626;border-bottom:1px solid var(--bord)" id="disc-row-display">
-          <span>Discount</span><span id="cart-disc-amt">$0.00</span>
+          <span>Discount</span><span id="cart-disc-amt">₦0.00</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:linear-gradient(135deg,#0F1F45,#1E3A8A);color:#fff">
           <div style="font-size:.9rem;font-weight:700">Grand Total</div>
-          <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="cart-total">$0.00</div>
+          <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="cart-total">₦0.00</div>
         </div>
       </div>
     </div>
@@ -998,7 +998,7 @@ function can(p){ if(SA_MODE) return true; return !!(PERMS[ME?.role||'cashier']?.
 // ── HELPERS ────────────────────────────────────────
 const g    = id => document.getElementById(id);
 const esc  = s  => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const fmt  = v  => (CFG.currency||'$')+parseFloat(v||0).toFixed(2);
+const fmt  = v  => (CFG.currency||'₦')+parseFloat(v||0).toFixed(2);
 const fmtDT= d  => { try{ return new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch{return'—';} };
 const fmtD = d  => { try{ const dt=new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }catch{return'';} };
 const tAgo = d  => { const m=Math.floor((Date.now()-new Date(d))/ 60000); if(m<1)return'just now'; if(m<60)return m+'m ago'; const h=Math.floor(m/60); if(h<24)return h+'h ago'; return Math.floor(h/24)+'d ago'; };
@@ -1126,7 +1126,7 @@ function setupApp(){
   applyRoleNav();
   // Settings defaults
   if(g('set-biz'))  g('set-biz').value  = CFG.bizName||'';
-  if(g('set-cur'))  g('set-cur').value  = CFG.currency||'$';
+  if(g('set-cur'))  g('set-cur').value  = CFG.currency||'₦';
   if(g('set-thr'))  g('set-thr').value  = CFG.threshold||10;
   if(g('set-addr')) g('set-addr').value = CFG.address||'';
   if(g('set-name')) g('set-name').value = name;
@@ -1259,7 +1259,7 @@ function renderSADash(){
   const totalR=BUYERS.reduce((a,b)=>a+(b.revenue||0),0);
   g('st-p').textContent=BUYERS.length+' buyers';
   g('st-s').textContent=totalS;
-  g('st-r').textContent='$'+totalR.toFixed(2);
+  g('st-r').textContent='₦'+totalR.toFixed(2);
   g('st-l').textContent=BUYERS.length;
   g('low-list').innerHTML='<div style="padding:14px;text-align:center;color:var(--t3);font-size:.83rem">Select a branch to view its inventory</div>';
   g('dash-recent').innerHTML='<div class="empty" style="padding:24px"><div class="empty-icon">🏢</div><div class="empty-sub">Use the Buyers page to enter a buyer\'s inventory</div></div>';
@@ -1669,7 +1669,7 @@ function drawChart(cid, days, salesData){
   data.forEach(s=>{const k=new Date(s.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'});if(map[k]!==undefined)map[k]+=s.total||0;});
   const labels=Object.keys(map),vals=Object.values(map),maxV=Math.max(...vals,1);
   const pad={t:14,r:10,b:26,l:42},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b,gx=cW/(labels.length||1);
-  [0,.5,1].forEach(pct=>{const y=pad.t+cH*(1-pct);ctx.strokeStyle='rgba(0,0,0,.05)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillStyle='#9CA3AF';ctx.font='9px Inter,sans-serif';ctx.textAlign='right';ctx.fillText((CFG.currency||'$')+(maxV*pct).toFixed(0),pad.l-3,y+3);});
+  [0,.5,1].forEach(pct=>{const y=pad.t+cH*(1-pct);ctx.strokeStyle='rgba(0,0,0,.05)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillStyle='#9CA3AF';ctx.font='9px Inter,sans-serif';ctx.textAlign='right';ctx.fillText((CFG.currency||'₦')+(maxV*pct).toFixed(0),pad.l-3,y+3);});
   const grad=ctx.createLinearGradient(0,pad.t,0,pad.t+cH);
   grad.addColorStop(0,'rgba(37,99,235,.18)');grad.addColorStop(1,'rgba(37,99,235,.01)');
   ctx.beginPath();vals.forEach((v,i)=>{const x=pad.l+i*gx+gx/2,y=pad.t+cH-(v/maxV)*cH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
@@ -1738,7 +1738,7 @@ async function renderBuyers(){
     return{id:b.id,prods:ps.size,sales:ss.size,rev};
   });
   const stats=await Promise.all(statsProms);
-  g('sa-p').textContent=totalP; g('sa-s').textContent=totalS; g('sa-r').textContent='$'+totalR.toFixed(2);
+  g('sa-p').textContent=totalP; g('sa-s').textContent=totalS; g('sa-r').textContent='₦'+totalR.toFixed(2);
   g('buyers-sub').textContent=BUYERS.length+' registered branch'+(BUYERS.length!==1?'s':'');
   const el=g('buyers-grid');
   const wb=g('sa-welcome'); if(wb) wb.classList.toggle('h', BUYERS.length>0);
@@ -1761,7 +1761,7 @@ async function renderBuyers(){
       <div class="bc-stats">
         <div class="bc-stat"><div class="bc-sv">${st.prods}</div><div class="bc-sl">Products</div></div>
         <div class="bc-stat"><div class="bc-sv">${st.sales}</div><div class="bc-sl">Sales</div></div>
-        <div class="bc-stat"><div class="bc-sv" style="font-size:.85rem">$${st.rev.toFixed(0)}</div><div class="bc-sl">Revenue</div></div>
+        <div class="bc-stat"><div class="bc-sv" style="font-size:.85rem">₦${st.rev.toFixed(0)}</div><div class="bc-sl">Revenue</div></div>
       </div>
       <div class="bc-btns">
         <button class="btn btn-b btn-sm" style="flex:2" onclick="enterBuyer('${b.id}')">🏢 Enter & Manage</button>
@@ -1794,8 +1794,8 @@ async function enterBuyer(bid){
 
 function openBuyerModal(id){
   g('bm-err').classList.add('h');
-  if(id){const b=BUYERS.find(x=>x.id===id);if(!b)return;g('bm-t').textContent='Edit Branch';g('bm-id').value=id;g('bm-name').value=b.name;g('bm-email').value=b.adminEmail;g('bm-pass').value='';g('bm-pin').value=b.pin||'';g('bm-cur').value=b.currency||'$';g('bm-type').value=b.type||'shop';g('bm-addr').value=b.address||'';}
-  else{g('bm-t').textContent='Create Branch';g('bm-id').value='';['bm-name','bm-email','bm-pass','bm-pin','bm-addr'].forEach(f=>g(f).value='');g('bm-cur').value='$';g('bm-type').value='shop';}
+  if(id){const b=BUYERS.find(x=>x.id===id);if(!b)return;g('bm-t').textContent='Edit Branch';g('bm-id').value=id;g('bm-name').value=b.name;g('bm-email').value=b.adminEmail;g('bm-pass').value='';g('bm-pin').value=b.pin||'';g('bm-cur').value=b.currency||'₦';g('bm-type').value=b.type||'shop';g('bm-addr').value=b.address||'';}
+  else{g('bm-t').textContent='Create Branch';g('bm-id').value='';['bm-name','bm-email','bm-pass','bm-pin','bm-addr'].forEach(f=>g(f).value='');g('bm-cur').value='₦';g('bm-type').value='shop';}
   openM('buyer-modal');
 }
 async function saveBuyer(){
@@ -1831,7 +1831,7 @@ async function deleteBuyer(id,name){
 // ── SETTINGS ──────────────────────────────────────
 async function saveSettings(){
   CFG.bizName=g('set-biz').value.trim()||'My Store';
-  CFG.currency=g('set-cur').value.trim()||'$';
+  CFG.currency=g('set-cur').value.trim()||'₦';
   CFG.threshold=parseInt(g('set-thr').value)||10;
   CFG.address=g('set-addr').value.trim();
   const sb=BID||ME?.buyerId; if(sb){try{await db.collection('buyers').doc(sb).update({name:CFG.bizName,currency:CFG.currency,threshold:CFG.threshold,address:CFG.address}); toast('Settings saved!','s');}catch(e){toast('Save failed: '+e.message,'e');}}
