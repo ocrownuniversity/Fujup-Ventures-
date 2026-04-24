@@ -1346,13 +1346,41 @@ async function saveProd(){
   if(!cat)  return ferr('pm-err','Category required.');
   if(isNaN(price)||price<0) return ferr('pm-err','Enter valid price.');
   if(isNaN(qty)||qty<0)     return ferr('pm-err','Enter valid quantity.');
+
+  // Check duplicate product name when adding new
+  if(!eid){
+    const dup=PRODS.find(p=>p.name.toLowerCase().trim()===name.toLowerCase().trim());
+    if(dup){
+      ferr('pm-err','⚠️ "'+name+'" already exists in your inventory! Find it in Products to edit or restock it.');
+      return;
+    }
+  }
+
+  // Prevent double-tap/click
+  const btn=g('pm-save');
+  if(btn.disabled) return;
+  btn.disabled=true; btn.textContent='Saving…';
+
   const data={name,category:cat,price,quantity:qty,sku:g('pm-sku').value.trim(),costPrice:parseFloat(g('pm-cost').value)||0,lowAt:parseInt(g('pm-low').value)||CFG.threshold,supplier:g('pm-sup').value.trim(),buyerId:effectiveProdBID};
   try{
     const col=db.collection('buyers').doc(effectiveProdBID).collection('products');
-    if(eid){ await col.doc(eid).update(data); }
-    else{ await col.add({...data, dateAdded:firebase.firestore.FieldValue.serverTimestamp()}); addNotif('info','Product Added',name+' added to inventory.'); }
-    closeM('prod-modal'); toast(eid?'Product updated!':'Product added!','s'); checkLowStock();
-  }catch(e){ ferr('pm-err','Save failed: '+e.message); }
+    if(eid){
+      await col.doc(eid).update(data);
+      closeM('prod-modal');
+      toast('✅ "'+name+'" updated successfully!','s');
+    } else {
+      await col.add({...data, dateAdded:firebase.firestore.FieldValue.serverTimestamp()});
+      addNotif('info','Product Added',name+' added to inventory.');
+      closeM('prod-modal');
+      toast('✅ "'+name+'" has been added to your inventory!','s');
+    }
+    checkLowStock();
+    await loadBranchData();
+  }catch(e){
+    ferr('pm-err','Save failed: '+e.message);
+    btn.disabled=false;
+    btn.textContent=eid?'Save Changes':'Add Product';
+  }
 }
 
 // ── DELETE ─────────────────────────────────────────
@@ -2462,7 +2490,7 @@ saveProd=async function(){
     const col=db.collection('buyers').doc(effectiveProdBID).collection('products');
     if(eid){ await col.doc(eid).update(data); }
     else{ await col.add({...data,dateAdded:firebase.firestore.FieldValue.serverTimestamp()}); addNotif('info','Product Added',name+' added to inventory.'); }
-    closeM('prod-modal'); toast(eid?'Product updated!':'Product added!','s');
+    closeM('prod-modal'); toast(eid?'✅ Product updated!':'✅ Product added to inventory!','s');
     checkLowStock(); checkExpiryAlerts();
   }catch(e){ferr('pm-err','Save failed: '+e.message);}
 };
