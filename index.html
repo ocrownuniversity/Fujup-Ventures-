@@ -1320,6 +1320,8 @@ function renderProds(){
 // ── PRODUCT MODAL ─────────────────────────────────
 function openProdModal(id){
   if(!can('prod')){toast('⛔ No permission to edit products','e');return;}
+  // Always reset button and error state
+  const btn=g('pm-save'); btn.disabled=false;
   g('pm-err').classList.add('h');
   if(id){
     const p=PRODS.find(x=>x.id===id); if(!p)return;
@@ -1327,11 +1329,11 @@ function openProdModal(id){
     g('pm-name').value=p.name; g('pm-cat').value=p.category||''; g('pm-sku').value=p.sku||'';
     g('pm-price').value=p.price; g('pm-cost').value=p.costPrice||''; g('pm-qty').value=p.quantity;
     g('pm-low').value=p.lowAt||CFG.threshold; g('pm-sup').value=p.supplier||'';
-    g('pm-save').textContent='Save Changes';
+    btn.textContent='Save Changes';
   } else {
     g('pm-t').textContent='Add Product'; g('pm-id').value='';
     ['pm-name','pm-cat','pm-sku','pm-price','pm-cost','pm-qty','pm-sup'].forEach(f=>g(f).value='');
-    g('pm-low').value=CFG.threshold; g('pm-save').textContent='Add Product';
+    g('pm-low').value=CFG.threshold; btn.textContent='Add Product';
   }
   openM('prod-modal');
 }
@@ -1371,8 +1373,16 @@ async function saveProd(){
     } else {
       await col.add({...data, dateAdded:firebase.firestore.FieldValue.serverTimestamp()});
       addNotif('info','Product Added',name+' added to inventory.');
-      closeM('prod-modal');
-      toast('✅ "'+name+'" has been added to your inventory!','s');
+      // Show success inside modal first, then close
+      btn.textContent='✅ Added!'; btn.style.background='#10B981';
+      g('pm-err').style.cssText='background:#F0FDF4;border-color:#BBF7D0;color:#166534;';
+      g('pm-err').textContent='✅ "'+name+'" has been successfully added to your inventory!';
+      g('pm-err').classList.remove('h');
+      setTimeout(()=>{
+        closeM('prod-modal');
+        toast('✅ "'+name+'" added to inventory!','s');
+        btn.style.background=''; btn.textContent='Add Product';
+      }, 1500);
     }
     checkLowStock();
     await loadBranchData();
