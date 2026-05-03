@@ -766,6 +766,32 @@ tbody tr:hover{background:var(--bg)}
           <div style="font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="cart-total">₦0.00</div>
         </div>
       </div>
+
+      <!-- Split Payment -->
+      <div style="margin-top:12px;background:var(--bg);border-radius:10px;padding:13px;">
+        <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-bottom:10px">💳 Payment</div>
+        <div id="split-rows">
+          <div class="split-row" data-index="0" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <select class="fc" style="flex:1;padding:8px 10px;font-size:.84rem" onchange="updateSplitTotal()">
+              <option value="cash">💵 Cash</option>
+              <option value="transfer">🏦 Transfer</option>
+              <option value="pos">💳 POS</option>
+              <option value="credit">📋 Credit</option>
+            </select>
+            <input type="number" class="fc" placeholder="Amount" style="flex:1;padding:8px 10px;font-size:.84rem" oninput="updateSplitTotal()" min="0" step="0.01"/>
+            <button onclick="removeSplitRow(this)" style="color:#EF4444;background:none;border:none;font-size:1.1rem;cursor:pointer;padding:4px;flex-shrink:0">✕</button>
+          </div>
+        </div>
+        <button onclick="addSplitRow()" class="btn btn-o btn-sm" style="width:100%;margin-bottom:8px">+ Add Payment Method</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.84rem;padding:6px 2px">
+          <span style="color:var(--t3);font-weight:600">Amount Entered:</span>
+          <span id="split-entered" style="font-weight:800;font-family:'JetBrains Mono',monospace;color:#2563EB">₦0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.84rem;padding:6px 2px">
+          <span style="color:var(--t3);font-weight:600">Balance:</span>
+          <span id="split-balance" style="font-weight:800;font-family:'JetBrains Mono',monospace;color:#EF4444">₦0.00</span>
+        </div>
+      </div>
     </div>
 
     <!-- Empty cart hint -->
@@ -1791,8 +1817,14 @@ async function saveStaff(){
   if(pass) data.password=pass;
   try{
     const col=db.collection('buyers').doc(effectiveBID).collection('staff');
-    if(eid){await col.doc(eid).update(data);}else{await col.add(data);}
-    closeM('staff-modal'); toast(eid?'Staff updated!':'Staff added!','s');
+    if(eid){await col.doc(eid).update(data);}
+    else{await col.add(data);}
+    // Reload staff immediately so they show up
+    const snap=await col.get();
+    STAFF=snap.docs.map(d=>({id:d.id,...d.data()}));
+    closeM('staff-modal');
+    toast(eid?'✅ Staff updated!':'✅ Staff added successfully!','s');
+    renderStaff();
   }catch(e){ferr('stm-err','Failed: '+e.message);}
 }
 async function removeStaff(id,name){ if(!confirm('Remove '+name+'?'))return; const b=BID||ME?.buyerId; if(!b)return; try{await db.collection('buyers').doc(b).collection('staff').doc(id).delete();toast('Staff removed','s');}catch(e){toast('Failed: '+e.message,'e');} }
@@ -2250,7 +2282,7 @@ function openSaleModal(){
   // Set current datetime as default
   const now=new Date(); const local=new Date(now-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
   if(g('sm-date')) g('sm-date').value=local;
-  g('sm-cust').value=''; paymentType='cash'; selPay('cash');
+  g('sm-cust').value=''; paymentType='cash'; if(typeof selPay==='function') selPay('cash'); resetSplitRows();
   populateCustDl();
   renderCart();
   const sel=g('sm-prod');
@@ -2259,6 +2291,71 @@ function openSaleModal(){
       `<option value="${p.id}" data-p="${p.price}" data-q="${p.quantity}" data-upp="${p.unitsPerPack||0}">${esc(p.name)} (${p.quantity} in stock)</option>`
     ).join('');
   openM('sale-modal');
+}
+
+// ── SPLIT PAYMENT FUNCTIONS ──────────────────────
+function addSplitRow(){
+  const rows=g('split-rows');
+  const idx=rows.children.length;
+  const div=document.createElement('div');
+  div.className='split-row';
+  div.dataset.index=idx;
+  div.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:8px';
+  div.innerHTML=`
+    <select class="fc" style="flex:1;padding:8px 10px;font-size:.84rem" onchange="updateSplitTotal()">
+      <option value="cash">💵 Cash</option>
+      <option value="transfer">🏦 Transfer</option>
+      <option value="pos">💳 POS</option>
+      <option value="credit">📋 Credit</option>
+    </select>
+    <input type="number" class="fc" placeholder="Amount" style="flex:1;padding:8px 10px;font-size:.84rem" oninput="updateSplitTotal()" min="0" step="0.01"/>
+    <button onclick="removeSplitRow(this)" style="color:#EF4444;background:none;border:none;font-size:1.1rem;cursor:pointer;padding:4px;flex-shrink:0">✕</button>`;
+  rows.appendChild(div);
+}
+
+function removeSplitRow(btn){
+  const row=btn.closest('.split-row');
+  if(g('split-rows').children.length<=1){toast('At least one payment method required','w');return;}
+  row.remove(); updateSplitTotal();
+}
+
+function updateSplitTotal(){
+  const grandTotal=parseFloat((g('cart-total')?.textContent||'0').replace(/[^0-9.]/g,''))||0;
+  const rows=[...document.querySelectorAll('.split-row')];
+  const entered=rows.reduce((a,r)=>{
+    const v=parseFloat(r.querySelector('input')?.value||0)||0;
+    return a+v;
+  },0);
+  const balance=Math.round((grandTotal-entered)*100)/100;
+  if(g('split-entered')) g('split-entered').textContent=fmt(entered);
+  if(g('split-balance')){
+    g('split-balance').textContent=fmt(Math.abs(balance));
+    g('split-balance').style.color=balance<=0?'#10B981':'#EF4444';
+    g('split-balance').previousElementSibling.textContent=balance<0?'Overpaid:':'Balance:';
+  }
+}
+
+function getSplitPayments(){
+  const rows=[...document.querySelectorAll('.split-row')];
+  return rows.map(r=>({
+    type: r.querySelector('select')?.value||'cash',
+    amount: parseFloat(r.querySelector('input')?.value||0)||0
+  })).filter(p=>p.amount>0);
+}
+
+function resetSplitRows(){
+  const rows=g('split-rows'); if(!rows) return;
+  rows.innerHTML=`<div class="split-row" data-index="0" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+    <select class="fc" style="flex:1;padding:8px 10px;font-size:.84rem" onchange="updateSplitTotal()">
+      <option value="cash">💵 Cash</option>
+      <option value="transfer">🏦 Transfer</option>
+      <option value="pos">💳 POS</option>
+      <option value="credit">📋 Credit</option>
+    </select>
+    <input type="number" class="fc" placeholder="Amount" style="flex:1;padding:8px 10px;font-size:.84rem" oninput="updateSplitTotal()" min="0" step="0.01"/>
+    <button onclick="removeSplitRow(this)" style="color:#EF4444;background:none;border:none;font-size:1.1rem;cursor:pointer;padding:4px;flex-shrink:0">✕</button>
+  </div>`;
+  updateSplitTotal();
 }
 
 // ── UPGRADED saveSale ─────────────────────────────
@@ -2280,6 +2377,16 @@ async function saveSale(){
   const receiptId='RCP-'+Date.now().toString(36).toUpperCase();
   const cashierName=ME.name||'Staff';
 
+  // Get split payments
+  const splitPayments=getSplitPayments();
+  if(splitPayments.length===0){ferr('sm-err','Enter at least one payment amount.');return;}
+  const totalPaid=Math.round(splitPayments.reduce((a,p)=>a+p.amount,0)*100)/100;
+  if(totalPaid<grandTotal-0.01){
+    ferr('sm-err','Amount entered ('+fmt(totalPaid)+') is less than total ('+fmt(grandTotal)+'). Please complete payment.');
+    return;
+  }
+  const primaryPayment=splitPayments[0].type;
+
   try{
     const batch=db.batch();
     const saleItems=[];
@@ -2296,13 +2403,26 @@ async function saveSale(){
         itemDiscountPct:item.discPct||0, itemDiscountAmt:item.discAmt||0,
         total:Math.round((item.subtotal-itemDisc)*100)/100,
         billDiscountAmt:itemDisc,
-        grandTotal, receiptId, paymentType,
+        grandTotal, receiptId,
+        paymentType:primaryPayment,
+        splitPayments:splitPayments,
         cashier:cashierName, customer:cust,
         timestamp:firebase.firestore.FieldValue.serverTimestamp(),
         saleDate:saleDate.toISOString(),
         status:'completed', buyerId:activeBID
       };
       batch.set(saleRef,saleData);
+      // Also record each split payment as a separate payment record
+      splitPayments.forEach(sp=>{
+        const pRef=db.collection('buyers').doc(activeBID).collection('payments').doc();
+        batch.set(pRef,{
+          receiptId, productName:item.name, customer:cust,
+          paymentType:sp.type, amount:sp.amount,
+          grandTotal, cashier:cashierName,
+          timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+          buyerId:activeBID
+        });
+      });
       batch.update(db.collection('buyers').doc(activeBID).collection('products').doc(item.productId),
         {quantity:firebase.firestore.FieldValue.increment(-item.qty)});
       saleItems.push({...item,finalTotal:saleData.total});
@@ -2314,8 +2434,9 @@ async function saveSale(){
       if(newQ<=(prod?.lowAt||CFG.threshold)) addNotif('warn','Low Stock',item.name+' is low ('+newQ+' units left).');
     }
     closeM('sale-modal');
-    toast('Sale complete! '+fmt(grandTotal)+' · '+CART.length+' item'+(CART.length>1?'s':''),'s');
-    setTimeout(()=>showCartReceipt(saleItems,cust,grandTotal,receiptId,cashierName,saleDate,paymentType,billDiscAmt),400);
+    const payLabel=splitPayments.length>1?'Split ('+splitPayments.map(p=>p.type).join('+')+')':(splitPayments[0]?.type||'cash');
+    toast('✅ Sale complete! '+fmt(grandTotal)+' · '+payLabel,'s');
+    setTimeout(()=>showCartReceipt(saleItems,cust,grandTotal,receiptId,cashierName,saleDate,splitPayments,billDiscAmt),400);
     CART=[];
   }catch(e){ferr('sm-err','Failed: '+e.message);}
 }
