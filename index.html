@@ -1099,28 +1099,63 @@ async function doLogin(){
   g('login-btn').disabled=true;
 
   try {
-    const allBuyers=await db.collection('buyers').get();
-    let foundBID=null,foundMe=null;
-    for(const bDoc of allBuyers.docs){
-      const bd=bDoc.data();
-      if(bd.adminEmail&&bd.adminEmail.toLowerCase()===email&&bd.adminPassword===pass){
-        foundBID=bDoc.id;
-        CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
-        foundMe={id:'admin-'+bDoc.id,name:bd.adminName||'Admin',role:'admin',email:bd.adminEmail,buyerId:bDoc.id};
-        break;
+    let foundBID=null, foundMe=null;
+
+    // Step 1: Check staff_lookup first (instant — no loop needed)
+    const lookupKey=email.replace(/[.#$[\]]/g,'_');
+    try{
+      const lu=await db.collection('staff_lookup').doc(lookupKey).get();
+      if(lu.exists){
+        const ld=lu.data();
+        if(ld.password===pass){
+          // Get buyer config
+          const bDoc=await db.collection('buyers').doc(ld.buyerId).get();
+          if(bDoc.exists){
+            const bd=bDoc.data();
+            foundBID=ld.buyerId;
+            CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
+            foundMe={id:ld.staffId,name:ld.name,role:ld.role,email:ld.email,buyerId:ld.buyerId};
+          }
+        }
       }
-      const staffSnap=await bDoc.ref.collection('staff').get();
-      for(const sd of staffSnap.docs){
-        const su=sd.data();
-        if(su.email&&su.email.toLowerCase()===email&&su.password===pass){
+    }catch(e){console.warn('lookup:',e.message);}
+
+    // Step 2: If not found in lookup, check buyer admins
+    if(!foundBID){
+      const allBuyers=await db.collection('buyers').get();
+      for(const bDoc of allBuyers.docs){
+        const bd=bDoc.data();
+        if(bd.adminEmail&&bd.adminEmail.toLowerCase()===email&&bd.adminPassword===pass){
           foundBID=bDoc.id;
           CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
-          foundMe={id:sd.id,name:su.name,role:su.role,email:su.email,buyerId:bDoc.id};
+          foundMe={id:'admin-'+bDoc.id,name:bd.adminName||'Admin',role:'admin',email:bd.adminEmail,buyerId:bDoc.id};
           break;
         }
       }
-      if(foundBID) break;
     }
+
+    // Step 3: Fallback — search staff subcollection directly
+    if(!foundBID){
+      const allBuyers=await db.collection('buyers').get();
+      for(const bDoc of allBuyers.docs){
+        const bd=bDoc.data();
+        const staffSnap=await bDoc.ref.collection('staff').get();
+        for(const sd of staffSnap.docs){
+          const su=sd.data();
+          if(su.email&&su.email.toLowerCase()===email&&su.password===pass){
+            foundBID=bDoc.id;
+            CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
+            foundMe={id:sd.id,name:su.name,role:su.role,email:su.email,buyerId:bDoc.id};
+            // Save to lookup so next login is fast
+            const lk=email.replace(/[.#$[\]]/g,'_');
+            db.collection('staff_lookup').doc(lk).set({...su,staffId:sd.id,buyerId:bDoc.id}).catch(()=>{});
+            break;
+          }
+        }
+        if(foundBID) break;
+      }
+    }
+
     if(!foundBID){ throw new Error('Invalid email or password'); }
     BID=foundBID; ME=foundMe;
     show('app'); setupApp();
@@ -1836,9 +1871,21 @@ async function saveStaff(){
   if(pass) data.password=pass;
   try{
     const col=db.collection('buyers').doc(effectiveBID).collection('staff');
-    if(eid){await col.doc(eid).update(data);}
-    else{await col.add(data);}
-    // Reload staff immediately so they show up
+    let staffId;
+    if(eid){
+      await col.doc(eid).update(data);
+      staffId=eid;
+    } else {
+      const ref=await col.add(data);
+      staffId=ref.id;
+    }
+    // Also save to top-level staff_lookup for fast login
+    // Key by email so lookup is instant
+    const lookupKey=email.replace(/[.#$[\]]/g,'_');
+    await db.collection('staff_lookup').doc(lookupKey).set({
+      ...data, staffId, buyerId:effectiveBID
+    });
+    // Reload staff
     const snap=await col.get();
     STAFF=snap.docs.map(d=>({id:d.id,...d.data()}));
     closeM('staff-modal');
