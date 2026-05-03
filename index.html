@@ -1199,24 +1199,43 @@ async function loadBuyers(){
 }
 async function loadBranchData(){
   if(!BID) return;
+  const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
+  const base=db.collection('buyers').doc(BID);
+
+  // Load products first — most important, load immediately
   try{
-    const base=db.collection('buyers').doc(BID);
-    // Load products and sales in parallel — skip notifs and staff unless needed
-    const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
-    const needsStaff = cur==='staff';
-    const needsNotifs = cur==='alerts';
-    const fetches = [base.collection('products').get(), base.collection('sales').get()];
-    if(needsStaff) fetches.push(base.collection('staff').get()); else fetches.push(Promise.resolve(null));
-    if(needsNotifs) fetches.push(base.collection('notifications').get()); else fetches.push(Promise.resolve(null));
-    const [p,s,st,n] = await Promise.all(fetches);
-    PRODS=p.docs.map(d=>({id:d.id,...d.data()})); PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
+    const p=await base.collection('products').get();
+    PRODS=p.docs.map(d=>({id:d.id,...d.data()}));
+    PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
+    if(cur==='products'||cur==='dashboard') { renderProds(); renderDash(); }
+    checkLowStock();
+  }catch(e){console.warn('products load:',e.message);}
+
+  // Load sales
+  try{
+    const s=await base.collection('sales').get();
     SALES=s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
     SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
-    if(st) STAFF=st.docs.map(d=>({id:d.id,...d.data()}));
-    if(n){ NOTIFS=n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));NOTIFS=NOTIFS.slice(0,50);}
-    const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff};
-    if(cur&&map[cur])map[cur](); updBadges(); checkLowStock();
-  }catch(e){console.warn('branch:',e.message);}
+    if(cur==='sales'||cur==='reports'||cur==='dashboard'){renderSales();renderRpt();renderDash();}
+    updBadges();
+  }catch(e){console.warn('sales load:',e.message);}
+
+  // Load staff
+  try{
+    const st=await base.collection('staff').get();
+    STAFF=st.docs.map(d=>({id:d.id,...d.data()}));
+    if(cur==='staff') renderStaff();
+  }catch(e){console.warn('staff load:',e.message);}
+
+  // Load notifications
+  try{
+    const n=await base.collection('notifications').get();
+    NOTIFS=n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
+    NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
+    NOTIFS=NOTIFS.slice(0,50);
+    if(cur==='alerts') renderNotifs();
+    updBadges();
+  }catch(e){console.warn('notifs load:',e.message);}
 }
 
 // ── NAVIGATION ─────────────────────────────────────
