@@ -1117,6 +1117,13 @@ async function doLogin(){
         role:'manager',
         branchName:'Fujup Venture Agbonmwonba'
       },
+      {
+        email:'eniolaforchrist1@gmail.com',
+        password:'Oyinda',
+        name:'Eniola Oriloye',
+        role:'manager',
+        branchName:'Fujup Venture Agbonmwonba'
+      },
     ];
     const hcStaff = HARDCODED_STAFF.find(s=>s.email.toLowerCase()===email&&s.password===pass);
     if(hcStaff){
@@ -1875,6 +1882,7 @@ function renderStaff(){
   const HC=[
     {id:'hc-adesuwap93',name:'Adesuwa',email:'adesuwap93@gmail.com',role:'manager',phone:'Hardcoded'},
     {id:'hc-oladeji',name:'Oladeji',email:'oladejiridwanopeyemi@gmail.com',role:'manager',phone:'Hardcoded'},
+    {id:'hc-eniola',name:'Eniola Oriloye',email:'eniolaforchrist1@gmail.com',role:'manager',phone:'Hardcoded'},
   ];
   const fbEmails=STAFF.map(s=>(s.email||'').toLowerCase());
   const hcToShow=HC.filter(h=>!fbEmails.includes(h.email.toLowerCase()));
