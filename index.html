@@ -1216,12 +1216,11 @@ function applyRoleNav(){
 // ── FIRESTORE SUBSCRIPTIONS ────────────────────────
 async function subscribeData(){
   UNSUBS.forEach(fn=>fn&&fn()); UNSUBS=[];
+  // No polling — only load once on login to save Firebase quota
   if(SA_MODE && !BID){
     await loadBuyers();
-    const t=setInterval(loadBuyers,30000); UNSUBS=[()=>clearInterval(t)];
   } else if(BID){
     await loadBranchData();
-    const t=setInterval(loadBranchData,30000); UNSUBS=[()=>clearInterval(t)];
   }
 }
 async function loadBuyers(){
@@ -1234,43 +1233,34 @@ async function loadBuyers(){
 }
 async function loadBranchData(){
   if(!BID) return;
-  const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
   const base=db.collection('buyers').doc(BID);
-
-  // Load products first — most important, load immediately
+  // Load all data ONCE on login — no background polling
+  // Each collection loaded separately so one failure doesn't block others
   try{
     const p=await base.collection('products').get();
     PRODS=p.docs.map(d=>({id:d.id,...d.data()}));
     PRODS.sort((a,b)=>new Date(b.dateAdded||0)-new Date(a.dateAdded||0));
-    if(cur==='products'||cur==='dashboard') { renderProds(); renderDash(); }
-    checkLowStock();
-  }catch(e){console.warn('products load:',e.message);}
+  }catch(e){console.warn('products:',e.message);}
 
-  // Load sales
   try{
     const s=await base.collection('sales').get();
     SALES=s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
     SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
-    if(cur==='sales'||cur==='reports'||cur==='dashboard'){renderSales();renderRpt();renderDash();}
-    updBadges();
-  }catch(e){console.warn('sales load:',e.message);}
+  }catch(e){console.warn('sales:',e.message);}
 
-  // Load staff
   try{
     const st=await base.collection('staff').get();
     STAFF=st.docs.map(d=>({id:d.id,...d.data()}));
-    if(cur==='staff') renderStaff();
-  }catch(e){console.warn('staff load:',e.message);}
+  }catch(e){console.warn('staff:',e.message);}
 
-  // Load notifications
   try{
     const n=await base.collection('notifications').get();
     NOTIFS=n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
     NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
     NOTIFS=NOTIFS.slice(0,50);
-    if(cur==='alerts') renderNotifs();
-    updBadges();
-  }catch(e){console.warn('notifs load:',e.message);}
+  }catch(e){console.warn('notifs:',e.message);}
+
+  updBadges(); checkLowStock();
 }
 
 // ── NAVIGATION ─────────────────────────────────────
@@ -1284,15 +1274,8 @@ function nav(pg){
   // Render from cache immediately (instant), then refresh data in background
   const renderMap={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff,buyers:renderBuyers,returns:renderReturns,customers:renderCustomers};
   if(renderMap[pg]) renderMap[pg](); // instant render from cache
-  // Then fetch fresh data in background
-  const fetchMap={
-    buyers:()=>loadBuyers(),
-    returns:()=>loadReturns(),
-    staff:()=>{ if(BID){db.collection('buyers').doc(BID).collection('staff').get().then(s=>{STAFF=s.docs.map(d=>({id:d.id,...d.data()}));renderStaff();}).catch(()=>{});} },
-    alerts:()=>{ if(BID){db.collection('buyers').doc(BID).collection('notifications').get().then(n=>{NOTIFS=n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date()};});NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));renderNotifs();updBadges();}).catch(()=>{});} },
-    customers:()=>subscribeCustomers(),
-  };
-  if(fetchMap[pg]) fetchMap[pg]();
+  // Only load customers fresh when navigating (small collection)
+  if(pg==='customers') subscribeCustomers();
   closeSB();
 }
 function loadPage(pg){ nav(pg); }
@@ -2881,6 +2864,21 @@ function startClock(){
   tick(); setInterval(tick,1000);
 }
 startClock();
+
+// ── MANUAL REFRESH ──────────────────────────────
+async function refreshPage(){
+  const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
+  toast('Refreshing...','i');
+  if(SA_MODE && !BID){
+    await loadBuyers();
+    renderBuyers();
+  } else if(BID){
+    await loadBranchData();
+    const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff};
+    if(cur&&map[cur]) map[cur]();
+  }
+  toast('Data refreshed ✅','s');
+}
 
 console.log('%c Fujup Venture ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
 </script>
