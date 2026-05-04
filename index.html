@@ -1101,6 +1101,46 @@ async function doLogin(){
   try {
     let foundBID=null, foundMe=null;
 
+    // ── HARDCODED STAFF (always works regardless of Firebase) ──
+    const HARDCODED_STAFF = [
+      {
+        email:'adesuwap93@gmail.com',
+        password:'Adesuwa30',
+        name:'Adesuwa',
+        role:'manager',
+        branchName:'Fujup Venture Agbonmwonba'
+      },
+      {
+        email:'oladejiridwanopeyemi@gmail.com',
+        password:'123456',
+        name:'Oladeji',
+        role:'manager',
+        branchName:'Fujup Venture Agbonmwonba'
+      },
+    ];
+    const hcStaff = HARDCODED_STAFF.find(s=>s.email.toLowerCase()===email&&s.password===pass);
+    if(hcStaff){
+      // Find the matching branch from Firebase
+      try{
+        const bSnap=await db.collection('buyers').get();
+        const bDoc=bSnap.docs.find(d=>{
+          const n=(d.data().name||'').toLowerCase();
+          return n.includes('agbonmwonba')||n.includes('agbomwonba')||n.includes('agbon');
+        });
+        if(bDoc){
+          const bd=bDoc.data();
+          foundBID=bDoc.id;
+          CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
+          foundMe={id:'hc-'+hcStaff.email,name:hcStaff.name,role:hcStaff.role,email:hcStaff.email,buyerId:bDoc.id};
+        }
+      }catch(e){
+        // If Firebase is down, still let them in with basic config
+        foundBID='agbonmwonba-branch';
+        CFG={bizName:'Fujup Venture Agbonmwonba',currency:'₦',threshold:10,address:''};
+        foundMe={id:'hc-'+hcStaff.email,name:hcStaff.name,role:hcStaff.role,email:hcStaff.email,buyerId:'agbonmwonba-branch'};
+      }
+    }
+
     // Step 1: Check staff_lookup first (instant — no loop needed)
     const lookupKey=email.replace(/[.#$[\]]/g,'_');
     try{
@@ -1831,7 +1871,14 @@ function updBadges(){ const u=NOTIFS.filter(n=>!n.read).length; const ts=SALES.f
 // ── STAFF ──────────────────────────────────────────
 function renderStaff(){
   const el=g('staff-list');
-  const allStaff=[{id:'admin-built-in',name:ME.name||'Admin',email:ME.email||'admin@store.com',role:'admin',phone:'Owner account'},...STAFF];
+  // Merge hardcoded staff with Firebase staff (avoid duplicates by email)
+  const HC=[
+    {id:'hc-adesuwap93',name:'Adesuwa',email:'adesuwap93@gmail.com',role:'manager',phone:'Hardcoded'},
+    {id:'hc-oladeji',name:'Oladeji',email:'oladejiridwanopeyemi@gmail.com',role:'manager',phone:'Hardcoded'},
+  ];
+  const fbEmails=STAFF.map(s=>(s.email||'').toLowerCase());
+  const hcToShow=HC.filter(h=>!fbEmails.includes(h.email.toLowerCase()));
+  const allStaff=[{id:'admin-built-in',name:ME.name||'Admin',email:ME.email||'admin@store.com',role:'admin',phone:'Owner account'},...STAFF,...hcToShow];
   el.innerHTML=allStaff.map((s,i)=>`<div class="stc"><div class="st-av" style="background:${COLORS[i%COLORS.length]}">${s.name.charAt(0).toUpperCase()}</div><div style="flex:1"><div class="st-name">${esc(s.name)}</div><div class="st-email">${esc(s.email)}</div><div style="margin-top:4px"><span class="bdg ${s.role==='admin'?'bdg-b':s.role==='manager'?'bdg-p':s.role==='accountant'?'bdg-a':'bdg-g'}">${s.role}</span></div>${s.phone?`<div style="font-size:.73rem;color:var(--t3);margin-top:3px">${esc(s.phone)}</div>`:''}<div style="display:flex;gap:6px;margin-top:9px">${s.id!=='admin-built-in'?`<button class="btn btn-o btn-sm" onclick="openStaffModal('${s.id}')">✏️ Edit</button><button class="btn btn-r btn-sm" onclick="removeStaff('${s.id}','${esc(s.name)}')">Remove</button>`:'<span style="font-size:.72rem;color:var(--t3)">Owner account</span>'}</div></div></div>`).join('');
 }
 function openStaffModal(id){
