@@ -1270,19 +1270,54 @@ async function subscribeData(){
     await loadBranchData();
   }
 }
-async function loadBuyers(){
+async function loadBuyers(forceRefresh){
+  const cacheKey='fv_cache_buyers';
+  if(!forceRefresh){
+    try{
+      const cached=localStorage.getItem(cacheKey);
+      if(cached){
+        const data=JSON.parse(cached);
+        const age=(Date.now()-(data.savedAt||0))/1000/60;
+        if(age<60){ BUYERS=data.buyers||[]; renderBuyers(); renderDash(); return; }
+      }
+    }catch(e){}
+  }
   try{
     const snap=await db.collection('buyers').get();
     BUYERS=snap.docs.map(d=>({id:d.id,...d.data()}));
+    try{ localStorage.setItem(cacheKey,JSON.stringify({buyers:BUYERS,savedAt:Date.now()})); }catch(e){}
     if(document.getElementById('pg-buyers')?.classList.contains('on')) renderBuyers();
     if(document.getElementById('pg-dashboard')?.classList.contains('on')) renderDash();
   }catch(e){console.warn('buyers:',e.message);}
 }
-async function loadBranchData(){
+async function loadBranchData(forceRefresh){
   if(!BID) return;
+
+  // Try loading from localStorage cache first (zero Firebase reads)
+  const cacheKey='fv_cache_'+BID;
+  if(!forceRefresh){
+    try{
+      const cached=localStorage.getItem(cacheKey);
+      if(cached){
+        const data=JSON.parse(cached);
+        const age=(Date.now()-(data.savedAt||0))/1000/60; // age in minutes
+        if(age<120){ // use cache if less than 2 hours old
+          PRODS=data.prods||[];
+          SALES=data.sales||[];
+          STAFF=data.staff||[];
+          NOTIFS=data.notifs||[];
+          updBadges(); checkLowStock();
+          console.log('Loaded from cache ('+Math.round(age)+'min old). 0 Firebase reads.');
+          return;
+        }
+      }
+    }catch(e){}
+  }
+
+  // Cache miss or force refresh — read from Firebase
+  console.log('Loading from Firebase...');
   const base=db.collection('buyers').doc(BID);
-  // Load all data ONCE on login — no background polling
-  // Each collection loaded separately so one failure doesn't block others
+
   try{
     const p=await base.collection('products').get();
     PRODS=p.docs.map(d=>({id:d.id,...d.data()}));
@@ -1306,6 +1341,14 @@ async function loadBranchData(){
     NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
     NOTIFS=NOTIFS.slice(0,50);
   }catch(e){console.warn('notifs:',e.message);}
+
+  // Save to localStorage cache
+  try{
+    localStorage.setItem(cacheKey, JSON.stringify({
+      prods:PRODS, sales:SALES, staff:STAFF, notifs:NOTIFS,
+      savedAt:Date.now()
+    }));
+  }catch(e){ console.warn('cache save:',e.message); }
 
   updBadges(); checkLowStock();
 }
@@ -1511,7 +1554,12 @@ async function saveProd(){
       }, 1800);
     }
     checkLowStock();
-    await loadBranchData();
+    // Update cache with new product (no extra Firebase read needed)
+    try{
+      const cacheKey='fv_cache_'+BID;
+      const cached=localStorage.getItem(cacheKey);
+      if(cached){ const d=JSON.parse(cached); d.prods=PRODS; d.savedAt=Date.now(); localStorage.setItem(cacheKey,JSON.stringify(d)); }
+    }catch(e){}
   }catch(e){
     ferr('pm-err','Save failed: '+e.message);
     btn.disabled=false; btn.style.opacity='';
@@ -2923,12 +2971,14 @@ startClock();
 // ── MANUAL REFRESH ──────────────────────────────
 async function refreshPage(){
   const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
-  toast('Refreshing...','i');
+  toast('Refreshing from Firebase...','i');
   if(SA_MODE && !BID){
     await loadBuyers();
     renderBuyers();
   } else if(BID){
-    await loadBranchData();
+    // Force refresh — bypass cache and read from Firebase
+    try{ localStorage.removeItem('fv_cache_'+BID); }catch(e){}
+    await loadBranchData(true);
     const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff};
     if(cur&&map[cur]) map[cur]();
   }
