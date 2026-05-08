@@ -1101,105 +1101,80 @@ async function doLogin(){
   try {
     let foundBID=null, foundMe=null;
 
-    // ── HARDCODED STAFF (always works regardless of Firebase) ──
-    const HARDCODED_STAFF = [
-      {
-        email:'adesuwap93@gmail.com',
-        password:'Adesuwa30',
-        name:'Adesuwa',
-        role:'manager',
-        branchName:'Fujup Venture Agbonmwonba'
-      },
-      {
-        email:'oladejiridwanopeyemi@gmail.com',
-        password:'123456',
-        name:'Oladeji',
-        role:'manager',
-        branchName:'Fujup Venture Agbonmwonba'
-      },
-      {
-        email:'eniolaforchrist1@gmail.com',
-        password:'Oyinda',
-        name:'Eniola Oriloye',
-        role:'manager',
-        branchName:'Fujup Venture Agbonmwonba'
-      },
+    // ── HARDCODED STAFF & BUYERS (zero Firebase reads for these) ──
+    const HARDCODED_BUYERS = [
+      {id:'__hq__', name:'Fujup Ventures Headquarter', currency:'₦', threshold:10, address:''},
+      {id:'__agbon__', name:'Fujup Venture Agbonmwonba', currency:'₦', threshold:10, address:''},
     ];
-    const hcStaff = HARDCODED_STAFF.find(s=>s.email.toLowerCase()===email&&s.password===pass);
-    if(hcStaff){
-      // Find the matching branch from Firebase
+    const HARDCODED_STAFF = [
+      {email:'adesuwap93@gmail.com',      password:'Adesuwa30', name:'Adesuwa',        role:'manager', buyerId:'__agbon__'},
+      {email:'oladejiridwanopeyemi@gmail.com', password:'123456',    name:'Oladeji',        role:'manager', buyerId:'__agbon__'},
+      {email:'eniolaforchrist1@gmail.com', password:'Oyinda',    name:'Eniola Oriloye', role:'manager', buyerId:'__agbon__'},
+    ];
+
+    // Check hardcoded staff first — no Firebase read at all
+    const hc=HARDCODED_STAFF.find(s=>s.email.toLowerCase()===email&&s.password===pass);
+    if(hc){
+      const hb=HARDCODED_BUYERS.find(b=>b.id===hc.buyerId)||HARDCODED_BUYERS[1];
+      // Try to get real branch ID from cache
       try{
-        const bSnap=await db.collection('buyers').get();
-        const bDoc=bSnap.docs.find(d=>{
-          const n=(d.data().name||'').toLowerCase();
-          return n.includes('agbonmwonba')||n.includes('agbomwonba')||n.includes('agbon');
-        });
-        if(bDoc){
-          const bd=bDoc.data();
-          foundBID=bDoc.id;
-          CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
-          foundMe={id:'hc-'+hcStaff.email,name:hcStaff.name,role:hcStaff.role,email:hcStaff.email,buyerId:bDoc.id};
+        const bCache=localStorage.getItem('fv_cache_buyers');
+        if(bCache){
+          const bData=JSON.parse(bCache);
+          const realB=(bData.buyers||[]).find(b=>(b.name||'').toLowerCase().includes('agbon'));
+          if(realB){ foundBID=realB.id; CFG={bizName:realB.name,currency:realB.currency||'₦',threshold:realB.threshold||10,address:realB.address||''}; }
         }
-      }catch(e){
-        // If Firebase is down, still let them in with basic config
-        foundBID='agbonmwonba-branch';
-        CFG={bizName:'Fujup Venture Agbonmwonba',currency:'₦',threshold:10,address:''};
-        foundMe={id:'hc-'+hcStaff.email,name:hcStaff.name,role:hcStaff.role,email:hcStaff.email,buyerId:'agbonmwonba-branch'};
-      }
+      }catch(e){}
+      if(!foundBID){ foundBID=hb.id; CFG={bizName:hb.name,currency:hb.currency,threshold:hb.threshold,address:hb.address}; }
+      foundMe={id:'hc-'+email,name:hc.name,role:hc.role,email:hc.email,buyerId:foundBID};
     }
 
-    // Step 1: Check staff_lookup first (instant — no loop needed)
-    const lookupKey=email.replace(/[.#$[\]]/g,'_');
-    try{
-      const lu=await db.collection('staff_lookup').doc(lookupKey).get();
-      if(lu.exists){
-        const ld=lu.data();
-        if(ld.password===pass){
-          // Get buyer config
-          const bDoc=await db.collection('buyers').doc(ld.buyerId).get();
-          if(bDoc.exists){
-            const bd=bDoc.data();
-            foundBID=ld.buyerId;
-            CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
-            foundMe={id:ld.staffId,name:ld.name,role:ld.role,email:ld.email,buyerId:ld.buyerId};
-          }
-        }
-      }
-    }catch(e){console.warn('lookup:',e.message);}
-
-    // Step 2: If not found in lookup, check buyer admins
+    // Check buyers cache — no Firebase read if cached
     if(!foundBID){
-      const allBuyers=await db.collection('buyers').get();
-      for(const bDoc of allBuyers.docs){
-        const bd=bDoc.data();
-        if(bd.adminEmail&&bd.adminEmail.toLowerCase()===email&&bd.adminPassword===pass){
-          foundBID=bDoc.id;
-          CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
-          foundMe={id:'admin-'+bDoc.id,name:bd.adminName||'Admin',role:'admin',email:bd.adminEmail,buyerId:bDoc.id};
+      let buyers=[];
+      try{
+        const bCache=localStorage.getItem('fv_cache_buyers');
+        if(bCache){ const bd=JSON.parse(bCache); buyers=bd.buyers||[]; }
+      }catch(e){}
+
+      // Check admin credentials against cached buyers
+      for(const b of buyers){
+        if(b.adminEmail&&b.adminEmail.toLowerCase()===email&&b.adminPassword===pass){
+          foundBID=b.id;
+          CFG={bizName:b.name,currency:b.currency||'₦',threshold:b.threshold||10,address:b.address||''};
+          foundMe={id:'admin-'+b.id,name:b.adminName||'Admin',role:'admin',email:b.adminEmail,buyerId:b.id};
           break;
         }
       }
-    }
 
-    // Step 3: Fallback — search staff subcollection directly
-    if(!foundBID){
-      const allBuyers=await db.collection('buyers').get();
-      for(const bDoc of allBuyers.docs){
-        const bd=bDoc.data();
-        const staffSnap=await bDoc.ref.collection('staff').get();
-        for(const sd of staffSnap.docs){
-          const su=sd.data();
-          if(su.email&&su.email.toLowerCase()===email&&su.password===pass){
-            foundBID=bDoc.id;
-            CFG={bizName:bd.name,currency:bd.currency||'₦',threshold:bd.threshold||10,address:bd.address||''};
-            foundMe={id:sd.id,name:su.name,role:su.role,email:su.email,buyerId:bDoc.id};
-            // Save to lookup so next login is fast
-            const lk=email.replace(/[.#$[\]]/g,'_');
-            db.collection('staff_lookup').doc(lk).set({...su,staffId:sd.id,buyerId:bDoc.id}).catch(()=>{});
+      // Not in cache — read from Firebase ONCE
+      if(!foundBID){
+        const allBuyers=await db.collection('buyers').get();
+        const buyerList=allBuyers.docs.map(d=>({id:d.id,...d.data()}));
+        // Cache buyers for next time
+        try{ localStorage.setItem('fv_cache_buyers',JSON.stringify({buyers:buyerList,savedAt:Date.now()})); }catch(e){}
+
+        for(const b of buyerList){
+          if(b.adminEmail&&b.adminEmail.toLowerCase()===email&&b.adminPassword===pass){
+            foundBID=b.id;
+            CFG={bizName:b.name,currency:b.currency||'₦',threshold:b.threshold||10,address:b.address||''};
+            foundMe={id:'admin-'+b.id,name:b.adminName||'Admin',role:'admin',email:b.adminEmail,buyerId:b.id};
             break;
           }
+          if(!foundBID){
+            const staffSnap=await bDoc.ref.collection('staff').get();
+            for(const sd of staffSnap.docs){
+              const su=sd.data();
+              if(su.email&&su.email.toLowerCase()===email&&su.password===pass){
+                foundBID=b.id;
+                CFG={bizName:b.name,currency:b.currency||'₦',threshold:b.threshold||10,address:b.address||''};
+                foundMe={id:sd.id,name:su.name,role:su.role,email:su.email,buyerId:b.id};
+                break;
+              }
+            }
+          }
+          if(foundBID) break;
         }
-        if(foundBID) break;
       }
     }
 
@@ -1510,11 +1485,10 @@ async function saveProd(){
   btn.textContent='Please wait…';
   btn.style.opacity='0.6';
 
-  // Check duplicate — fetch fresh from Firebase (not just cache)
+  // Check duplicate — use local PRODS cache (zero Firebase reads)
   if(!eid){
     try{
-      const existing=await db.collection('buyers').doc(effectiveProdBID).collection('products').get();
-      const allProds=existing.docs.map(d=>d.data());
+      const allProds=PRODS.length>0?PRODS:(()=>{try{const c=localStorage.getItem('fv_cache_'+effectiveProdBID);if(c)return JSON.parse(c).prods||[];}catch(e){}return[];})();
       const dup=allProds.find(p=>(p.name||'').toLowerCase().trim()=== name.toLowerCase().trim());
       if(dup){
         btn.disabled=false; btn.textContent='Add Product';
