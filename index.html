@@ -2572,17 +2572,69 @@ async function saveSale(){
       saleItems.push({...item,finalTotal:saleData.total});
     }
     await batch.commit();
+
+    // Update local arrays immediately — so sales show without refresh
     for(const item of CART){
       const prod=PRODS.find(p=>p.id===item.productId);
-      const newQ=(prod?.quantity||0)-item.qty;
+      if(prod){
+        prod.quantity=Math.round((prod.quantity-item.qty)*100)/100;
+      }
+      const newQ=prod?.quantity||0;
       if(newQ<=(prod?.lowAt||CFG.threshold)) addNotif('warn','Low Stock',item.name+' is low ('+newQ+' units left).');
+      // Add sale to local SALES array
+      const nowDate=new Date();
+      SALES.unshift({
+        id:'local-'+Date.now()+'-'+Math.random().toString(36).slice(2),
+        productId:item.productId,
+        productName:item.name,
+        category:item.category||'',
+        quantity:item.qty,
+        unitPrice:item.unitPrice,
+        discountAmt:(item.discAmt||0),
+        total:item.subtotal,
+        grandTotal,
+        receiptId,
+        paymentType:splitPayments[0]?.type||'cash',
+        splitPayments,
+        cashier:cashierName,
+        customer:cust,
+        timestamp:nowDate,
+        saleDate:nowDate.toISOString(),
+        status:'completed',
+        buyerId:activeBID
+      });
     }
+
+    // Update cache with new sales and products
+    try{
+      const cKey='fv_cache_'+activeBID;
+      const c=localStorage.getItem(cKey);
+      if(c){
+        const d=JSON.parse(c);
+        d.sales=SALES;
+        d.prods=PRODS;
+        d.savedAt=Date.now();
+        localStorage.setItem(cKey,JSON.stringify(d));
+      }
+    }catch(e){}
+
     closeM('sale-modal');
     const payLabel=splitPayments.length>1?'Split ('+splitPayments.map(p=>p.type).join('+')+')':(splitPayments[0]?.type||'cash');
-    toast('✅ Sale complete! '+fmt(grandTotal)+' · '+payLabel,'s');
+    toast('✅ Sale recorded! '+fmt(grandTotal)+' · '+payLabel,'s');
+    // Refresh current page if on sales or dashboard
+    const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
+    if(cur==='sales') renderSales();
+    if(cur==='dashboard') renderDash();
     setTimeout(()=>showCartReceipt(saleItems,cust,grandTotal,receiptId,cashierName,saleDate,splitPayments,billDiscAmt),400);
     CART=[];
-  }catch(e){ferr('sm-err','Failed: '+e.message);}
+  }catch(e){
+    const msg=e.message||'';
+    if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')){
+      ferr('sm-err','⚠️ Firebase quota exceeded. Sale was NOT saved. Wait until tomorrow or upgrade Firebase plan.');
+    } else {
+      ferr('sm-err','Failed: '+msg);
+    }
+  }
 }
 
 // ── UPGRADED renderSales ──────────────────────────
