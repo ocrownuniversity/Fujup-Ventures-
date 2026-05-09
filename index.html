@@ -1498,43 +1498,45 @@ async function saveProd(){
   }
 
   btn.textContent='Saving…';
-  const data={name,category:cat,price,quantity:qty,sku:g('pm-sku').value.trim(),
+  const data={name,category:cat,price,quantity:qty,
+    sku:g('pm-sku').value.trim(),
     costPrice:parseFloat(g('pm-cost').value)||0,
     lowAt:parseInt(g('pm-low').value)||CFG.threshold,
-    supplier:g('pm-sup').value.trim(),buyerId:effectiveProdBID};
+    supplier:g('pm-sup').value.trim(),
+    buyerId:effectiveProdBID
+  };
+  function resetBtn(t){btn.disabled=false;btn.style.opacity='';btn.style.background='';btn.textContent=t||'Add Product';btn.onclick=()=>{btn.onclick=null;saveProd();};}
   try{
     const col=db.collection('buyers').doc(effectiveProdBID).collection('products');
     if(eid){
       await col.doc(eid).update(data);
+      const idx=PRODS.findIndex(p=>p.id===eid);
+      if(idx>=0) PRODS[idx]={...PRODS[idx],...data};
+      resetBtn('Save Changes');
       closeM('prod-modal');
-      toast('✅ "'+name+'" updated successfully!','s');
+      toast('✅ "'+name+'" updated!','s');
     } else {
-      await col.add({...data, dateAdded:firebase.firestore.FieldValue.serverTimestamp()});
-      addNotif('info','Product Added',name+' added to inventory.');
-      // Show green success inside modal then close
-      btn.textContent='✅ Added!'; btn.style.background='#10B981';
+      const ref=await col.add({...data,dateAdded:firebase.firestore.FieldValue.serverTimestamp()});
+      PRODS.unshift({id:ref.id,...data,dateAdded:new Date().toISOString()});
+      try{const cKey='fv_cache_'+effectiveProdBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}}catch(e){}
+      addNotif('info','Product Added',name+' added.');
+      btn.textContent='✅ Added!';btn.style.background='#10B981';
       const err=g('pm-err');
-      err.style.cssText='background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;border-radius:8px;padding:10px 13px;font-size:.85rem;font-weight:600;margin-bottom:11px;';
-      err.innerHTML='✅ <strong>"'+name+'"</strong> has been added to your inventory!';
+      err.style.cssText='background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;border-radius:8px;padding:10px 13px;font-size:.85rem;font-weight:700;margin-bottom:11px;';
+      err.innerHTML='✅ <strong>"'+name+'"</strong> added to inventory!';
       err.classList.remove('h');
-      setTimeout(()=>{
-        closeM('prod-modal');
-        toast('✅ "'+name+'" added to inventory!','s');
-        btn.style.background=''; btn.style.opacity=''; btn.disabled=false; btn.textContent='Add Product'; btn.onclick=()=>{ btn.onclick=null; saveProd(); };
-      }, 1800);
+      if(g('pg-products')?.classList.contains('on')) renderProds();
+      setTimeout(()=>{closeM('prod-modal');toast('✅ "'+name+'" added!','s');resetBtn();},1500);
     }
     checkLowStock();
-    // Update cache with new product (no extra Firebase read needed)
-    try{
-      const cacheKey='fv_cache_'+BID;
-      const cached=localStorage.getItem(cacheKey);
-      if(cached){ const d=JSON.parse(cached); d.prods=PRODS; d.savedAt=Date.now(); localStorage.setItem(cacheKey,JSON.stringify(d)); }
-    }catch(e){}
   }catch(e){
-    ferr('pm-err','Save failed: '+e.message);
-    btn.disabled=false; btn.style.opacity='';
-    btn.textContent=eid?'Save Changes':'Add Product';
-    btn.onclick=()=>{ btn.onclick=null; saveProd(); };
+    const msg=e.message||'';
+    if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')){
+      ferr('pm-err','⚠️ Firebase quota exceeded. Please wait until tomorrow or upgrade your Firebase plan. Your product was NOT saved.');
+    } else {
+      ferr('pm-err','Save failed: '+msg);
+    }
+    resetBtn(eid?'Save Changes':'Add Product');
   }
 }
 
