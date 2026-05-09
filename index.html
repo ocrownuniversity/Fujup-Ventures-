@@ -1217,7 +1217,15 @@ function setupApp(){
   // SA settings card
   if(SA_MODE && !BID){ g('sa-pin-card')?.classList.remove('h'); g('pin-change-card')?.classList.add('h'); }
   // Subscribe to Firestore
-  subscribeData().then(()=>{ if(SA_MODE && !BID){ nav('buyers'); } else { nav('dashboard'); } });
+  subscribeData().then(()=>{
+    if(SA_MODE && !BID){ nav('buyers'); } else { nav('dashboard'); }
+    // Auto-sync offline queue after login
+    updateSyncBtn();
+    if(OFFLINE_QUEUE.length>0){
+      toast('You have '+OFFLINE_QUEUE.length+' offline items. Tap "Sync" to upload.','w');
+      setTimeout(()=>trySyncQueue(), 3000);
+    }
+  });
 }
 
 function applyRoleNav(){
@@ -1531,12 +1539,31 @@ async function saveProd(){
     checkLowStock();
   }catch(e){
     const msg=e.message||'';
-    if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')){
-      ferr('pm-err','⚠️ Firebase quota exceeded. Please wait until tomorrow or upgrade your Firebase plan. Your product was NOT saved.');
+    if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')||msg.includes('Failed to get')){
+      // Save to offline queue — will sync when quota resets
+      const localId='local-'+Date.now();
+      if(eid){
+        queueOp({type:'updateProduct',bid:effectiveProdBID,id:eid,data});
+      } else {
+        PRODS.unshift({id:localId,...data,dateAdded:new Date().toISOString(),_offline:true});
+        queueOp({type:'addProduct',bid:effectiveProdBID,data:{...data,dateAdded:new Date().toISOString()}});
+        // Update cache
+        try{const cKey='fv_cache_'+effectiveProdBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}}catch(ex){}
+        btn.textContent='✅ Saved Offline!'; btn.style.background='#F59E0B';
+        const err=g('pm-err');
+        err.style.cssText='background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;border-radius:8px;padding:10px 13px;font-size:.85rem;font-weight:700;margin-bottom:11px;';
+        err.innerHTML='⚠️ Saved locally! Will sync to Firebase automatically when quota resets.';
+        err.classList.remove('h');
+        if(g('pg-products')?.classList.contains('on')) renderProds();
+        setTimeout(()=>{closeM('prod-modal');toast('⚠️ "'+name+'" saved offline — will sync later','w');resetBtn();},1800);
+        checkLowStock();
+        return;
+      }
+      resetBtn(eid?'Save Changes':'Add Product');
     } else {
       ferr('pm-err','Save failed: '+msg);
+      resetBtn(eid?'Save Changes':'Add Product');
     }
-    resetBtn(eid?'Save Changes':'Add Product');
   }
 }
 
@@ -2629,8 +2656,35 @@ async function saveSale(){
     CART=[];
   }catch(e){
     const msg=e.message||'';
-    if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')){
-      ferr('sm-err','⚠️ Firebase quota exceeded. Sale was NOT saved. Wait until tomorrow or upgrade Firebase plan.');
+    if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')||msg.includes('Failed to get')){
+      // Save sale to offline queue and local array
+      const nowDate=new Date();
+      for(const item of CART){
+        const saleId='local-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+        const saleData={
+          productId:item.productId, productName:item.name, category:item.category||'',
+          quantity:item.qty, unitPrice:item.unitPrice, discountAmt:item.discAmt||0,
+          total:item.subtotal, grandTotal, receiptId,
+          paymentType:splitPayments[0]?.type||'cash', splitPayments,
+          cashier:cashierName, customer:cust,
+          timestamp:nowDate, saleDate:nowDate.toISOString(),
+          status:'completed', buyerId:activeBID, _offline:true
+        };
+        SALES.unshift({id:saleId,...saleData});
+        queueOp({type:'addSale',bid:activeBID,id:saleId,data:saleData});
+        // Reduce product qty locally
+        const prod=PRODS.find(p=>p.id===item.productId);
+        if(prod) prod.quantity=Math.round((prod.quantity-item.qty)*100)/100;
+        queueOp({type:'updateStock',bid:activeBID,id:item.productId,quantity:prod?.quantity||0});
+      }
+      // Update cache
+      try{const cKey='fv_cache_'+activeBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.sales=SALES;d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}}catch(ex){}
+      closeM('sale-modal');
+      toast('⚠️ Sale saved offline! Will sync to Firebase when quota resets.','w');
+      const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
+      if(cur==='sales') renderSales();
+      if(cur==='dashboard') renderDash();
+      CART=[];
     } else {
       ferr('sm-err','Failed: '+msg);
     }
@@ -2924,6 +2978,43 @@ applyRoleNav=function(){
 
 // ── RETURNS ──────────────────────────────────────
 let RETURNS = [];
+let OFFLINE_QUEUE = JSON.parse(localStorage.getItem('fv_offline_queue')||'[]');
+
+// ── OFFLINE QUEUE — saves ops when Firebase quota exceeded ──
+function queueOp(op){
+  OFFLINE_QUEUE.push({...op, queuedAt:Date.now()});
+  localStorage.setItem('fv_offline_queue', JSON.stringify(OFFLINE_QUEUE));
+  console.log('Queued offline op:', op.type);
+}
+
+async function syncOfflineQueue(){
+  if(!OFFLINE_QUEUE.length) return;
+  const remaining=[];
+  for(const op of OFFLINE_QUEUE){
+    try{
+      if(op.type==='addProduct'){
+        await db.collection('buyers').doc(op.bid).collection('products').add(op.data);
+      } else if(op.type==='updateProduct'){
+        await db.collection('buyers').doc(op.bid).collection('products').doc(op.id).update(op.data);
+      } else if(op.type==='addSale'){
+        await db.collection('buyers').doc(op.bid).collection('sales').doc(op.id).set(op.data);
+      } else if(op.type==='updateStock'){
+        await db.collection('buyers').doc(op.bid).collection('products').doc(op.id).update({quantity:op.quantity});
+      }
+    }catch(e){
+      if(e.message?.includes('quota')||e.message?.includes('Quota')||e.message?.includes('resource-exhausted')){
+        remaining.push(op); // still over quota, keep in queue
+      }
+      // else drop it — other error
+    }
+  }
+  OFFLINE_QUEUE=remaining;
+  localStorage.setItem('fv_offline_queue', JSON.stringify(OFFLINE_QUEUE));
+  if(remaining.length===0) toast('✅ All offline data synced to Firebase!','s');
+  else toast('⚠️ '+remaining.length+' items still waiting for quota reset','w');
+}
+
+function getOfflineQueueCount(){ return OFFLINE_QUEUE.length; }
 
 async function loadReturns(){
   const b=BID||ME?.buyerId; if(!b) return;
@@ -3019,6 +3110,24 @@ function startClock(){
   tick(); setInterval(tick,1000);
 }
 startClock();
+
+// ── SYNC OFFLINE QUEUE ───────────────────────────
+async function trySyncQueue(){
+  if(!OFFLINE_QUEUE.length){ toast('Nothing to sync','i'); return; }
+  toast('Syncing '+OFFLINE_QUEUE.length+' offline items...','i');
+  await syncOfflineQueue();
+  // Refresh cache after sync
+  if(BID) await loadBranchData(true);
+  const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
+  const map={dashboard:renderDash,products:renderProds,sales:renderSales};
+  if(cur&&map[cur]) map[cur]();
+}
+
+function updateSyncBtn(){
+  const btn=document.getElementById('sync-btn');
+  if(btn) btn.style.display=OFFLINE_QUEUE.length>0?'inline-flex':'none';
+  if(btn&&OFFLINE_QUEUE.length>0) btn.textContent='☁️ Sync ('+OFFLINE_QUEUE.length+' pending)';
+}
 
 // ── MANUAL REFRESH ──────────────────────────────
 async function refreshPage(){
