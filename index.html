@@ -1310,12 +1310,8 @@ async function loadBranchData(forceRefresh){
     STAFF=st.docs.map(d=>({id:d.id,...d.data()}));
   }catch(e){console.warn('staff:',e.message);}
 
-  try{
-    const n=await base.collection('notifications').get();
-    NOTIFS=n.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,time:dt.time?.toDate?.()|| new Date(dt.time||Date.now())};});
-    NOTIFS.sort((a,b)=>new Date(b.time)-new Date(a.time));
-    NOTIFS=NOTIFS.slice(0,50);
-  }catch(e){console.warn('notifs:',e.message);}
+  // Skip reading notifications from Firebase — use local only to save reads
+  // NOTIFS stay in memory from session
 
   // Save to localStorage cache
   try{
@@ -1884,6 +1880,11 @@ function drawChart(cid, days, salesData){
 
 // ── NOTIFICATIONS ──────────────────────────────────
 async function addNotif(type,title,text){
+  // Local only — no Firebase write to save quota
+  const n={id:'local-'+Date.now(),type,title,text,time:new Date(),read:false};
+  NOTIFS.unshift(n); NOTIFS=NOTIFS.slice(0,50);
+  updBadges(); return; // skip Firebase write
+  // (Firebase write disabled to save quota)
   const notifBID = BID || ME?.buyerId; if(!notifBID)return; const BID_=notifBID;
   try{ await db.collection('buyers').doc(BID_).collection('notifications').add({type,title,text,time:firebase.firestore.FieldValue.serverTimestamp(),read:false,buyerId:BID_}); }catch(e){console.warn('notif:',e);}
 }
@@ -1945,9 +1946,9 @@ async function saveStaff(){
     await db.collection('staff_lookup').doc(lookupKey).set({
       ...data, staffId, buyerId:effectiveBID
     });
-    // Reload staff
-    const snap=await col.get();
-    STAFF=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Update local STAFF array directly — no extra Firebase read
+    if(!eid){ STAFF.push({id:staffId||'new',...data}); }
+    else{ const idx=STAFF.findIndex(s=>s.id===eid); if(idx>=0) STAFF[idx]={...STAFF[idx],...data}; }
     closeM('staff-modal');
     toast(eid?'✅ Staff updated!':'✅ Staff added successfully!','s');
     renderStaff();
@@ -1960,13 +1961,20 @@ async function renderBuyers(){
   g('sa-b').textContent=BUYERS.length;
   g('buyers-sub').textContent=BUYERS.length+' registered branch'+(BUYERS.length!==1?'s':'');
   let totalP=0,totalS=0,totalR=0;
-  const statsProms=BUYERS.map(async b=>{
-    const [ps,ss]=await Promise.all([db.collection('buyers').doc(b.id).collection('products').get(),db.collection('buyers').doc(b.id).collection('sales').get()]);
-    const rev=ss.docs.reduce((a,d)=>a+(d.data().total||0),0);
-    totalP+=ps.size; totalS+=ss.size; totalR+=rev;
-    return{id:b.id,prods:ps.size,sales:ss.size,rev};
+  // Use localStorage cache only — zero Firebase reads per branch
+  const stats=BUYERS.map(b=>{
+    try{
+      const c=localStorage.getItem('fv_cache_'+b.id);
+      if(c){
+        const d=JSON.parse(c);
+        const p=(d.prods||[]).length, s=(d.sales||[]).length;
+        const rev=(d.sales||[]).reduce((a,x)=>a+(x.total||0),0);
+        totalP+=p; totalS+=s; totalR+=rev;
+        return{id:b.id,prods:p,sales:s,rev};
+      }
+    }catch(e){}
+    return{id:b.id,prods:'?',sales:'?',rev:0};
   });
-  const stats=await Promise.all(statsProms);
   g('sa-p').textContent=totalP; g('sa-s').textContent=totalS; g('sa-r').textContent='₦'+totalR.toFixed(2);
   g('buyers-sub').textContent=BUYERS.length+' registered branch'+(BUYERS.length!==1?'s':'');
   const el=g('buyers-grid');
@@ -2153,9 +2161,17 @@ let CUST_UNSUB = null;
 
 async function subscribeCustomers(){
   const b=BID||ME?.buyerId; if(!b) return;
+  // Use cache first
+  try{
+    const cKey='fv_cache_'+b+'_customers';
+    const cached=localStorage.getItem(cKey);
+    if(cached){ CUSTOMERS=JSON.parse(cached); renderCustomers(); populateCustDl(); return; }
+  }catch(e){}
+  // Cache miss — read from Firebase once
   try{
     const snap=await db.collection('buyers').doc(b).collection('customers').get();
     CUSTOMERS=snap.docs.map(d=>({id:d.id,...d.data()}));
+    try{ localStorage.setItem('fv_cache_'+b+'_customers', JSON.stringify(CUSTOMERS)); }catch(e){}
     if(g('pg-customers')?.classList.contains('on')) renderCustomers();
     populateCustDl();
   }catch(e){console.warn('customers:',e.message);}
@@ -2857,10 +2873,18 @@ let RETURNS = [];
 
 async function loadReturns(){
   const b=BID||ME?.buyerId; if(!b) return;
+  // Use cache first
+  try{
+    const cKey='fv_cache_'+b+'_returns';
+    const cached=localStorage.getItem(cKey);
+    if(cached){ RETURNS=JSON.parse(cached); renderReturns(); return; }
+  }catch(e){}
+  // Cache miss — read from Firebase once
   try{
     const snap=await db.collection('buyers').doc(b).collection('returns').get();
     RETURNS=snap.docs.map(d=>({id:d.id,...d.data()}));
     RETURNS.sort((a,b)=>new Date(b.returnedAt||0)-new Date(a.returnedAt||0));
+    try{ localStorage.setItem('fv_cache_'+b+'_returns', JSON.stringify(RETURNS)); }catch(e){}
     renderReturns();
   }catch(e){console.warn('returns:',e.message);}
 }
