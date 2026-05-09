@@ -1547,16 +1547,23 @@ async function saveProd(){
       } else {
         PRODS.unshift({id:localId,...data,dateAdded:new Date().toISOString(),_offline:true});
         queueOp({type:'addProduct',bid:effectiveProdBID,data:{...data,dateAdded:new Date().toISOString()}});
-        // Update cache
-        try{const cKey='fv_cache_'+effectiveProdBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}}catch(ex){}
-        btn.textContent='✅ Saved Offline!'; btn.style.background='#F59E0B';
+        // Update cache with new product
+        try{const cKey='fv_cache_'+effectiveProdBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));} else {localStorage.setItem('fv_cache_'+effectiveProdBID,JSON.stringify({prods:PRODS,sales:SALES,staff:STAFF,notifs:NOTIFS,savedAt:Date.now()}));}}catch(ex){}
+        btn.textContent='✅ Saved!'; btn.style.background='#F59E0B';
         const err=g('pm-err');
         err.style.cssText='background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;border-radius:8px;padding:10px 13px;font-size:.85rem;font-weight:700;margin-bottom:11px;';
-        err.innerHTML='⚠️ Saved locally! Will sync to Firebase automatically when quota resets.';
+        err.innerHTML='✅ "'+name+'" saved! Will sync to Firebase when quota resets.';
         err.classList.remove('h');
-        if(g('pg-products')?.classList.contains('on')) renderProds();
-        setTimeout(()=>{closeM('prod-modal');toast('⚠️ "'+name+'" saved offline — will sync later','w');resetBtn();},1800);
+        // Refresh ALL pages that show product data
+        renderProds();
+        renderDash();
         checkLowStock();
+        updateSyncBtn();
+        setTimeout(()=>{
+          closeM('prod-modal');
+          toast('✅ "'+name+'" added! (offline — syncs later)','s');
+          resetBtn();
+        },1500);
         return;
       }
       resetBtn(eid?'Save Changes':'Add Product');
