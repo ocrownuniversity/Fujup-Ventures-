@@ -713,11 +713,12 @@ tbody tr:hover{background:var(--bg)}
     <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px">
       <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-bottom:10px">➕ Add Product to Cart</div>
       <div style="display:grid;grid-template-columns:1fr 90px 36px auto;gap:8px;align-items:end">
-        <div>
+        <div style="position:relative">
           <label class="fl">Product</label>
-          <select class="fc" id="sm-prod" onchange="onSP()" style="font-size:.85rem">
-            <option value="">— Select product —</option>
-          </select>
+          <input class="fc" id="sm-prod-search" placeholder="🔍 Search product..." autocomplete="off"
+            oninput="filterProdDropdown()" onfocus="showProdDropdown()" style="font-size:.85rem"/>
+          <input type="hidden" id="sm-prod" data-p="" data-q="" data-ups="1" data-ut="unit"/>
+          <div id="sm-prod-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surf);border:1.5px solid #2563EB;border-radius:0 0 10px 10px;max-height:220px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.15)"></div>
         </div>
         <div>
           <label class="fl">Qty</label>
@@ -2348,10 +2349,12 @@ function setCartQty(qty){
 
 // ── UPGRADED onSP ─────────────────────────────────
 function onSP(){
-  const sel=g('sm-prod'), opt=sel.options[sel.selectedIndex];
-  if(!opt||!opt.value){ g('sm-info').classList.add('h'); g('half-btns-row')?.classList.add('h'); return; }
-  const price=parseFloat(opt.dataset.p), stock=parseInt(opt.dataset.q);
-  const unitsPerPack=parseInt(opt.dataset.upp||0);
+  const sel=g('sm-prod');
+  const pid=sel.value;
+  if(!pid){ g('sm-info').classList.add('h'); g('half-btns-row')?.classList.add('h'); return; }
+  const price=parseFloat(sel.dataset.p||0);
+  const stock=parseInt(sel.dataset.q||0);
+  const unitsPerPack=parseInt(sel.dataset.ups||sel.dataset.upp||0);
   g('sm-qty').value='1';
   g('sm-qty').max=stock;
   g('sm-qty').step=unitsPerPack>1?'0.25':'1';
@@ -2362,17 +2365,20 @@ function onSP(){
 
 // ── UPGRADED addToCart ────────────────────────────
 function addToCart(){
-  const sel=g('sm-prod'), opt=sel.options[sel.selectedIndex];
-  if(!opt||!opt.value){ toast('Select a product first','w'); return; }
+  const sel=g('sm-prod');
+  const pid=sel.value;
+  if(!pid){ toast('Select a product first','w'); return; }
   const qty=parseFloat(g('sm-qty').value);
   if(!qty||qty<=0){ toast('Enter a valid quantity','w'); return; }
 
-  const pid=opt.value, price=parseFloat(opt.dataset.p), stock=parseInt(opt.dataset.q);
-  const name=opt.text.split(' (')[0];
+  const price=parseFloat(sel.dataset.p||0);
+  const stock=parseInt(sel.dataset.q||0);
+  const name=(g('sm-prod-search')?.value||'').split(' (')[0].trim()||pid;
   const prod=PRODS.find(p=>p.id===pid);
   const discPct=parseFloat(g('sm-item-disc')?.value)||0;
   const discAmt=price*qty*(discPct/100);
   const subtotal=price*qty-discAmt;
+  const ups=parseInt(sel.dataset.ups||sel.dataset.upp||0);
 
   const existing=CART.find(c=>c.productId===pid);
   const alreadyQty=existing?existing.qty:0;
@@ -2384,11 +2390,15 @@ function addToCart(){
     existing.discAmt=Math.round((existing.discAmt||0)*100+discAmt*100)/100;
     existing.subtotal=Math.round(existing.qty*price*(1-discPct/100)*100)/100;
   } else {
-    CART.push({productId:pid,name,category:prod?.category||'',qty:Math.round(qty*1000)/1000,unitPrice:price,discPct,discAmt:Math.round(discAmt*100)/100,subtotal:Math.round(subtotal*100)/100,unitsPerPack:parseInt(opt.dataset.upp||0)});
+    CART.push({productId:pid,name,category:prod?.category||'',qty:Math.round(qty*1000)/1000,unitPrice:price,discPct,discAmt:Math.round(discAmt*100)/100,subtotal:Math.round(subtotal*100)/100,unitsPerPack:ups});
   }
 
   renderCart();
-  g('sm-prod').value=''; g('sm-qty').value='1';
+  // Reset search
+  sel.value=''; sel.dataset.p=''; sel.dataset.q=''; sel.dataset.ups='1'; sel.dataset.ut='unit';
+  if(g('sm-prod-search')){ g('sm-prod-search').value=''; }
+  if(g('sm-prod-dropdown')) g('sm-prod-dropdown').style.display='none';
+  g('sm-qty').value='1';
   if(g('sm-item-disc')) g('sm-item-disc').value='';
   g('sm-info').classList.add('h');
   g('half-btns-row')?.classList.add('h');
@@ -2443,6 +2453,85 @@ function changeCartQty(index,delta){
   item.subtotal=Math.round(item.qty*item.unitPrice*(1-item.discPct/100)*100)/100;
   renderCart();
 }
+
+// ── PRODUCT SEARCH DROPDOWN ──────────────────────
+let PROD_DROPDOWN_DATA = [];
+
+function buildProdDropdown(){
+  // Always read directly from PRODS array — no separate copy needed
+  PROD_DROPDOWN_DATA = PRODS;
+}
+
+function filterProdDropdown(){
+  const q=(g('sm-prod-search')?.value||'').toLowerCase().trim();
+  const dd=g('sm-prod-dropdown');
+  if(!dd) return;
+  if(!q){ dd.style.display='none'; return; }
+  // Search ALL prods including out of stock — let user see everything
+  const src = PRODS.length>0 ? PRODS : PROD_DROPDOWN_DATA;
+  const matches=src.filter(p=>(p.name||'').toLowerCase().includes(q)).slice(0,40);
+  if(!matches.length){
+    dd.innerHTML='<div style="padding:12px 14px;color:var(--t3);font-size:.84rem">No products found for "'+q+'"</div>';
+  } else {
+    dd.innerHTML=matches.map(p=>{
+      const qty=p.quantity||0;
+      const outStr=qty<=0?' <span style="color:#EF4444;font-size:.7rem">(Out of stock)</span>':'';
+      return `<div onclick="selectProd('${p.id}')"
+        style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bord);font-size:.85rem;display:flex;justify-content:space-between;align-items:center;${qty<=0?'opacity:.5':''}">
+        <div>
+          <div style="font-weight:700;color:var(--navy)">${esc(p.name||'')}${outStr}</div>
+          <div style="font-size:.75rem;color:var(--t3)">${qty} ${p.unitType||'units'} in stock</div>
+        </div>
+        <div style="font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace;font-size:.85rem">${fmt(p.price||0)}</div>
+      </div>`;
+    }).join('');
+  }
+  dd.style.display='block';
+}
+
+function showProdDropdown(){
+  const q=(g('sm-prod-search')?.value||'').trim();
+  if(q) filterProdDropdown();
+  else {
+    // Show all products when input is focused and empty
+    const dd=g('sm-prod-dropdown');
+    if(!dd) return;
+    const src=PRODS.length>0?PRODS:PROD_DROPDOWN_DATA;
+    const top=src.slice(0,40);
+    dd.innerHTML=top.map(p=>`
+      <div onclick="selectProd('${p.id}')"
+        style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bord);font-size:.85rem;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;color:var(--navy)">${esc(p.name||'')}</div>
+          <div style="font-size:.75rem;color:var(--t3)">${p.quantity||0} ${p.unitType||'units'} in stock</div>
+        </div>
+        <div style="font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace;font-size:.85rem">${fmt(p.price||0)}</div>
+      </div>`).join('');
+    dd.style.display=top.length?'block':'none';
+  }
+}
+
+function selectProd(pid){
+  const p=PRODS.find(x=>x.id===pid)||PROD_DROPDOWN_DATA.find(x=>x.id===pid);
+  if(!p) return;
+  const inp=g('sm-prod-search');
+  if(inp) inp.value=p.name;
+  const sel=g('sm-prod');
+  sel.value=pid;
+  sel.dataset.p=p.price||0;
+  sel.dataset.q=p.quantity||0;
+  sel.dataset.ups=p.unitsPerPack||1;
+  sel.dataset.ut=p.unitType||'unit';
+  g('sm-prod-dropdown').style.display='none';
+  onSP();
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click',e=>{
+  const dd=g('sm-prod-dropdown');
+  const inp=g('sm-prod-search');
+  if(dd&&inp&&!dd.contains(e.target)&&e.target!==inp) dd.style.display='none';
+});
 
 // ── UPGRADED openSaleModal ────────────────────────
 function openSaleModal(){
