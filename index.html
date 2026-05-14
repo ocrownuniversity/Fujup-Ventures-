@@ -1034,7 +1034,17 @@ function toast(msg,t='i'){ const el=document.createElement('div'); el.className=
 function ferr(id,msg){ const e=g(id); if(e){e.textContent=msg;e.classList.remove('h');} }
 function tpw(id){ const e=g(id); if(e) e.type=e.type==='password'?'text':'password'; }
 function openM(id){ g(id)?.classList.remove('h'); document.body.style.overflow='hidden'; }
-function closeM(id){ g(id)?.classList.add('h'); document.body.style.overflow=''; }
+function closeM(id){
+  const el=g(id); if(!el) return;
+  el.classList.add('h');
+  document.body.style.overflow='';
+  // If closing prod-modal, always fully reset the save button
+  if(id==='prod-modal'){
+    const btn=g('pm-save');
+    if(btn){ btn.disabled=false; btn.style.opacity=''; btn.style.background=''; btn.textContent=g('pm-id')?.value?'Save Changes':'Add Product'; btn.onclick=()=>{btn.onclick=null;saveProd();}; }
+    g('pm-err')?.classList.add('h');
+  }
+}
 
 // ── DARK MODE ──────────────────────────────────────
 function applyDark(){ document.documentElement.toggleAttribute('data-dark',DARK); const b=g('dark-btn'); if(b) b.textContent=DARK?'☀️ Light':'🌙 Dark'; }
@@ -1536,7 +1546,10 @@ async function saveProd(){
       err.innerHTML='✅ <strong>"'+name+'"</strong> added to inventory!';
       err.classList.remove('h');
       if(g('pg-products')?.classList.contains('on')) renderProds();
-      setTimeout(()=>{closeM('prod-modal');toast('✅ "'+name+'" added!','s');resetBtn();},1500);
+      setTimeout(()=>{
+        closeM('prod-modal');
+        toast('✅ "'+name+'" added!','s');
+      },1500);
     }
     checkLowStock();
   }catch(e){
@@ -1564,7 +1577,6 @@ async function saveProd(){
         setTimeout(()=>{
           closeM('prod-modal');
           toast('✅ "'+name+'" added! (offline — syncs later)','s');
-          resetBtn();
         },1500);
         return;
       }
