@@ -494,11 +494,10 @@ tbody tr:hover{background:var(--bg)}
           <button class="btn btn-b btn-sm" id="btn-new-sale" onclick="openSaleModal()">+ New Sale</button>
         </div>
       </div>
-      <div class="sg" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+      <div class="sg">
         <div class="sc"><div class="sc-icon" style="background:#EFF6FF">📦</div><div><div class="label">Products</div><div class="value" id="st-p">0</div><div class="sub" id="st-p-s"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#F0FDF4">💳</div><div><div class="label">Today Sales</div><div class="value" id="st-s">0</div><div class="sub" id="st-s-s" style="color:#10B981"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#FFFBEB">💰</div><div><div class="label">Today Revenue</div><div class="value" id="st-r">₦0</div><div class="sub" id="st-r-s"></div></div></div>
-        <div class="sc" style="border-left:3px solid #10B981"><div class="sc-icon" style="background:#F0FDF4">📈</div><div><div class="label">Today Profit</div><div class="value" id="st-profit" style="color:#059669">₦0</div><div class="sub" id="st-profit-s" style="color:#059669"></div></div></div>
         <div class="sc" style="border-left:3px solid #EF4444"><div class="sc-icon" style="background:#FEF2F2">⚠️</div><div><div class="label">Low / Out Stock</div><div class="value" id="st-l">0</div><div class="sub" style="color:#EF4444">Need restock</div></div></div>
       </div>
       <div id="dash-grid" style="display:grid;grid-template-columns:1fr 340px;gap:14px">
@@ -1393,30 +1392,12 @@ function renderDash(){
   const tR=tS.reduce((a,s)=>a+(s.total||0),0);
   const lw=PRODS.filter(p=>p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold));
   const ot=PRODS.filter(p=>p.quantity===0);
-  // Calculate today's profit = revenue minus cost price
-  let tProfit=0;
-  for(const s of tS){
-    const prod=PRODS.find(p=>p.id===s.productId);
-    const cost=(prod?.costPrice||0)*s.quantity;
-    tProfit+=(s.total||0)-cost;
-  }
-  tProfit=Math.round(tProfit*100)/100;
-  const profitPct=tR>0?Math.round((tProfit/tR)*100):0;
-
   g('st-p').textContent=PRODS.length;
   g('st-p-s').textContent=ot.length+' out of stock';
   g('st-s').textContent=tS.length;
   g('st-s-s').textContent=fmt(tR)+' revenue';
   g('st-r').textContent=fmt(tR);
   g('st-l').textContent=lw.length+ot.length;
-  // Show profit only to Super Admin
-  const profitCard=document.getElementById('st-profit')?.closest('.sc');
-  if(profitCard) profitCard.style.display=(SA_MODE)?'flex':'none';
-  if(SA_MODE && g('st-profit')){
-    g('st-profit').textContent=fmt(tProfit);
-    g('st-profit').style.color=tProfit>=0?'#059669':'#EF4444';
-    if(g('st-profit-s')) g('st-profit-s').textContent=profitPct+'% margin';
-  }
   // Low list
   const ll=g('low-list');
   const items=[...ot,...lw].slice(0,5);
