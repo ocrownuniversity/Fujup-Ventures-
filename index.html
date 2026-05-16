@@ -494,11 +494,10 @@ tbody tr:hover{background:var(--bg)}
           <button class="btn btn-b btn-sm" id="btn-new-sale" onclick="openSaleModal()">+ New Sale</button>
         </div>
       </div>
-      <div class="sg" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+      <div class="sg">
         <div class="sc"><div class="sc-icon" style="background:#EFF6FF">📦</div><div><div class="label">Products</div><div class="value" id="st-p">0</div><div class="sub" id="st-p-s"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#F0FDF4">💳</div><div><div class="label">Today Sales</div><div class="value" id="st-s">0</div><div class="sub" id="st-s-s" style="color:#10B981"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#FFFBEB">💰</div><div><div class="label">Today Revenue</div><div class="value" id="st-r">₦0</div><div class="sub" id="st-r-s"></div></div></div>
-        <div class="sc" style="border-left:3px solid #10B981"><div class="sc-icon" style="background:#F0FDF4">📈</div><div><div class="label">Today Profit</div><div class="value" id="st-profit" style="color:#059669">₦0</div><div class="sub" id="st-profit-s" style="color:#059669"></div></div></div>
         <div class="sc" style="border-left:3px solid #EF4444"><div class="sc-icon" style="background:#FEF2F2">⚠️</div><div><div class="label">Low / Out Stock</div><div class="value" id="st-l">0</div><div class="sub" style="color:#EF4444">Need restock</div></div></div>
       </div>
       <div id="dash-grid" style="display:grid;grid-template-columns:1fr 340px;gap:14px">
@@ -1035,17 +1034,7 @@ function toast(msg,t='i'){ const el=document.createElement('div'); el.className=
 function ferr(id,msg){ const e=g(id); if(e){e.textContent=msg;e.classList.remove('h');} }
 function tpw(id){ const e=g(id); if(e) e.type=e.type==='password'?'text':'password'; }
 function openM(id){ g(id)?.classList.remove('h'); document.body.style.overflow='hidden'; }
-function closeM(id){
-  const el=g(id); if(!el) return;
-  el.classList.add('h');
-  document.body.style.overflow='';
-  // If closing prod-modal, always fully reset the save button
-  if(id==='prod-modal'){
-    const btn=g('pm-save');
-    if(btn){ btn.disabled=false; btn.style.opacity=''; btn.style.background=''; btn.textContent=g('pm-id')?.value?'Save Changes':'Add Product'; btn.onclick=()=>{btn.onclick=null;saveProd();}; }
-    g('pm-err')?.classList.add('h');
-  }
-}
+function closeM(id){ g(id)?.classList.add('h'); document.body.style.overflow=''; }
 
 // ── DARK MODE ──────────────────────────────────────
 function applyDark(){ document.documentElement.toggleAttribute('data-dark',DARK); const b=g('dark-btn'); if(b) b.textContent=DARK?'☀️ Light':'🌙 Dark'; }
@@ -1393,30 +1382,12 @@ function renderDash(){
   const tR=tS.reduce((a,s)=>a+(s.total||0),0);
   const lw=PRODS.filter(p=>p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold));
   const ot=PRODS.filter(p=>p.quantity===0);
-  // Calculate today's profit = revenue minus cost price
-  let tProfit=0;
-  for(const s of tS){
-    const prod=PRODS.find(p=>p.id===s.productId);
-    const cost=(prod?.costPrice||0)*s.quantity;
-    tProfit+=(s.total||0)-cost;
-  }
-  tProfit=Math.round(tProfit*100)/100;
-  const profitPct=tR>0?Math.round((tProfit/tR)*100):0;
-
   g('st-p').textContent=PRODS.length;
   g('st-p-s').textContent=ot.length+' out of stock';
   g('st-s').textContent=tS.length;
   g('st-s-s').textContent=fmt(tR)+' revenue';
   g('st-r').textContent=fmt(tR);
   g('st-l').textContent=lw.length+ot.length;
-  // Show profit only to Super Admin
-  const profitCard=document.getElementById('st-profit')?.closest('.sc');
-  if(profitCard) profitCard.style.display=(SA_MODE)?'flex':'none';
-  if(SA_MODE && g('st-profit')){
-    g('st-profit').textContent=fmt(tProfit);
-    g('st-profit').style.color=tProfit>=0?'#059669':'#EF4444';
-    if(g('st-profit-s')) g('st-profit-s').textContent=profitPct+'% margin';
-  }
   // Low list
   const ll=g('low-list');
   const items=[...ot,...lw].slice(0,5);
@@ -1565,10 +1536,7 @@ async function saveProd(){
       err.innerHTML='✅ <strong>"'+name+'"</strong> added to inventory!';
       err.classList.remove('h');
       if(g('pg-products')?.classList.contains('on')) renderProds();
-      setTimeout(()=>{
-        closeM('prod-modal');
-        toast('✅ "'+name+'" added!','s');
-      },1500);
+      setTimeout(()=>{closeM('prod-modal');toast('✅ "'+name+'" added!','s');resetBtn();},1500);
     }
     checkLowStock();
   }catch(e){
@@ -1596,6 +1564,7 @@ async function saveProd(){
         setTimeout(()=>{
           closeM('prod-modal');
           toast('✅ "'+name+'" added! (offline — syncs later)','s');
+          resetBtn();
         },1500);
         return;
       }
