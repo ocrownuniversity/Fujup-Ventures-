@@ -498,7 +498,7 @@ tbody tr:hover{background:var(--bg)}
         <div class="sc"><div class="sc-icon" style="background:#EFF6FF">📦</div><div><div class="label">Products</div><div class="value" id="st-p">0</div><div class="sub" id="st-p-s"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#F0FDF4">💳</div><div><div class="label">Today Sales</div><div class="value" id="st-s">0</div><div class="sub" id="st-s-s" style="color:#10B981"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#FFFBEB">💰</div><div><div class="label">Today Revenue</div><div class="value" id="st-r">₦0</div><div class="sub" id="st-r-s"></div></div></div>
-        <div class="sc" style="border-left:3px solid #10B981" id="profit-card"><div class="sc-icon" style="background:#F0FDF4">📈</div><div style="flex:1"><div class="label">Profit</div><div class="value" id="st-profit" style="color:#059669">₦0</div><div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap" id="profit-tabs"><span onclick="setProfitTab('today',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:#2563EB;color:#fff">Today</span><span onclick="setProfitTab('week',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">Week</span><span onclick="setProfitTab('month',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">Month</span><span onclick="setProfitTab('all',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">All</span></div><div class="sub" id="st-profit-s" style="color:#059669;margin-top:2px"></div></div></div>
+        <div class="sc" style="border-left:3px solid #10B981"><div class="sc-icon" style="background:#F0FDF4">📈</div><div><div class="label">Today Profit</div><div class="value" id="st-profit" style="color:#059669">₦0</div><div class="sub" id="st-profit-s" style="color:#059669"></div></div></div>
         <div class="sc" style="border-left:3px solid #EF4444"><div class="sc-icon" style="background:#FEF2F2">⚠️</div><div><div class="label">Low / Out Stock</div><div class="value" id="st-l">0</div><div class="sub" style="color:#EF4444">Need restock</div></div></div>
       </div>
       <div id="dash-grid" style="display:grid;grid-template-columns:1fr 340px;gap:14px">
@@ -1393,29 +1393,15 @@ function renderDash(){
   const tR=tS.reduce((a,s)=>a+(s.total||0),0);
   const lw=PRODS.filter(p=>p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold));
   const ot=PRODS.filter(p=>p.quantity===0);
-  // Calculate profit for all periods
-  function calcProfit(salesList){
-    let p=0;
-    for(const s of salesList){
-      const prod=PRODS.find(x=>x.id===s.productId);
-      const cost=(prod?.costPrice||0)*s.quantity;
-      p+=(s.total||0)-cost;
-    }
-    return Math.round(p*100)/100;
+  // Calculate today's profit = revenue minus cost price
+  let tProfit=0;
+  for(const s of tS){
+    const prod=PRODS.find(p=>p.id===s.productId);
+    const cost=(prod?.costPrice||0)*s.quantity;
+    tProfit+=(s.total||0)-cost;
   }
-  const now2=new Date();
-  const weekStart=new Date(now2);weekStart.setDate(now2.getDate()-now2.getDay());weekStart.setHours(0,0,0,0);
-  const monthStart=new Date(now2.getFullYear(),now2.getMonth(),1);
-  window._profitData={
-    today:calcProfit(tS),
-    week:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=weekStart)),
-    month:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=monthStart)),
-    all:calcProfit(SALES)
-  };
-  window._profitTab=window._profitTab||'today';
-  const tProfit=window._profitData[window._profitTab]||0;
-  const tProfitRev=window._profitTab==='today'?tR:SALES.filter(s=>new Date(s.timestamp)>=(window._profitTab==='week'?weekStart:window._profitTab==='month'?monthStart:new Date(0))).reduce((a,s)=>a+(s.total||0),0);
-  const profitPct=tProfitRev>0?Math.round((tProfit/tProfitRev)*100):0;
+  tProfit=Math.round(tProfit*100)/100;
+  const profitPct=tR>0?Math.round((tProfit/tR)*100):0;
 
   g('st-p').textContent=PRODS.length;
   g('st-p-s').textContent=ot.length+' out of stock';
@@ -3287,25 +3273,6 @@ async function refreshPage(){
     if(cur&&map[cur]) map[cur]();
   }
   toast('Data refreshed ✅','s');
-}
-
-// ── PROFIT TAB SWITCHER ─────────────────────────
-function setProfitTab(tab, el){
-  window._profitTab = tab;
-  // Update tab styles
-  document.querySelectorAll('#profit-tabs span').forEach(s=>{
-    s.style.background='var(--bord)'; s.style.color='var(--t3)';
-  });
-  if(el){ el.style.background='#2563EB'; el.style.color='#fff'; }
-  // Recalculate and show
-  const d=window._profitData||{today:0,week:0,month:0,all:0};
-  const profit=d[tab]||0;
-  const labels={today:'Today',week:'This Week',month:'This Month',all:'All Time'};
-  if(g('st-profit')){
-    g('st-profit').textContent=fmt(profit);
-    g('st-profit').style.color=profit>=0?'#059669':'#EF4444';
-  }
-  if(g('st-profit-s')) g('st-profit-s').textContent=labels[tab]+' profit';
 }
 
 console.log('%c Fujup Venture ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
