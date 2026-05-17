@@ -498,7 +498,7 @@ tbody tr:hover{background:var(--bg)}
         <div class="sc"><div class="sc-icon" style="background:#EFF6FF">📦</div><div><div class="label">Products</div><div class="value" id="st-p">0</div><div class="sub" id="st-p-s"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#F0FDF4">💳</div><div><div class="label">Today Sales</div><div class="value" id="st-s">0</div><div class="sub" id="st-s-s" style="color:#10B981"></div></div></div>
         <div class="sc"><div class="sc-icon" style="background:#FFFBEB">💰</div><div><div class="label">Today Revenue</div><div class="value" id="st-r">₦0</div><div class="sub" id="st-r-s"></div></div></div>
-        <div class="sc" style="border-left:3px solid #10B981"><div class="sc-icon" style="background:#F0FDF4">📈</div><div><div class="label">Today Profit</div><div class="value" id="st-profit" style="color:#059669">₦0</div><div class="sub" id="st-profit-s" style="color:#059669"></div></div></div>
+        <div class="sc" style="border-left:3px solid #10B981" id="profit-card"><div class="sc-icon" style="background:#F0FDF4">📈</div><div style="flex:1"><div class="label">Profit</div><div class="value" id="st-profit" style="color:#059669">₦0</div><div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap" id="profit-tabs"><span onclick="setProfitTab('today',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:#2563EB;color:#fff">Today</span><span onclick="setProfitTab('week',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">Week</span><span onclick="setProfitTab('month',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">Month</span><span onclick="setProfitTab('all',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">All</span></div><div class="sub" id="st-profit-s" style="color:#059669;margin-top:2px"></div></div></div>
         <div class="sc" style="border-left:3px solid #EF4444"><div class="sc-icon" style="background:#FEF2F2">⚠️</div><div><div class="label">Low / Out Stock</div><div class="value" id="st-l">0</div><div class="sub" style="color:#EF4444">Need restock</div></div></div>
       </div>
       <div id="dash-grid" style="display:grid;grid-template-columns:1fr 340px;gap:14px">
@@ -1128,17 +1128,27 @@ async function doLogin(){
     // Check hardcoded staff first — no Firebase read at all
     const hc=HARDCODED_STAFF.find(s=>s.email.toLowerCase()===email&&s.password===pass);
     if(hc){
-      const hb=HARDCODED_BUYERS.find(b=>b.id===hc.buyerId)||HARDCODED_BUYERS[1];
-      // Try to get real branch ID from cache
+      // Always fetch real branch ID from Firebase for hardcoded staff
       try{
-        const bCache=localStorage.getItem('fv_cache_buyers');
-        if(bCache){
-          const bData=JSON.parse(bCache);
-          const realB=(bData.buyers||[]).find(b=>(b.name||'').toLowerCase().includes('agbon'));
-          if(realB){ foundBID=realB.id; CFG={bizName:realB.name,currency:realB.currency||'₦',threshold:realB.threshold||10,address:realB.address||''}; }
+        const bSnap=await db.collection('buyers').get();
+        const allB=bSnap.docs.map(d=>({id:d.id,...d.data()}));
+        // Cache buyers list for future use
+        try{localStorage.setItem('fv_cache_buyers',JSON.stringify({buyers:allB,savedAt:Date.now()}));}catch(e){}
+        BUYERS=allB;
+        // Find Agbonmwonba branch
+        const realB=allB.find(b=>{
+          const n=(b.name||'').toLowerCase();
+          return n.includes('agbon')||n.includes('agbom')||n.includes('agbonmwonba');
+        })||allB[0];
+        if(realB){
+          foundBID=realB.id;
+          CFG={bizName:realB.name,currency:realB.currency||'₦',threshold:realB.threshold||10,address:realB.address||''};
         }
-      }catch(e){}
-      if(!foundBID){ foundBID=hb.id; CFG={bizName:hb.name,currency:hb.currency,threshold:hb.threshold,address:hb.address}; }
+      }catch(e){
+        // Firebase down — use hardcoded fallback
+        foundBID='__agbon__';
+        CFG={bizName:'Fujup Venture Agbonmwonba',currency:'₦',threshold:10,address:''};
+      }
       foundMe={id:'hc-'+email,name:hc.name,role:hc.role,email:hc.email,buyerId:foundBID};
     }
 
@@ -1268,16 +1278,22 @@ async function subscribeData(){
 }
 async function loadBuyers(forceRefresh){
   const cacheKey='fv_cache_buyers';
+  // Load from cache only if not forcing refresh AND cache has data
   if(!forceRefresh){
     try{
       const cached=localStorage.getItem(cacheKey);
       if(cached){
         const data=JSON.parse(cached);
         const age=(Date.now()-(data.savedAt||0))/1000/60;
-        if(age<60){ BUYERS=data.buyers||[]; renderBuyers(); renderDash(); return; }
+        const buyers=data.buyers||[];
+        if(age<120 && buyers.length>0){
+          BUYERS=buyers;
+          renderBuyers(); renderDash(); return;
+        }
       }
     }catch(e){}
   }
+  // Always read from Firebase if cache empty or expired
   try{
     const snap=await db.collection('buyers').get();
     BUYERS=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1296,14 +1312,16 @@ async function loadBranchData(forceRefresh){
       const cached=localStorage.getItem(cacheKey);
       if(cached){
         const data=JSON.parse(cached);
-        const age=(Date.now()-(data.savedAt||0))/1000/60; // age in minutes
-        if(age<120){ // use cache if less than 2 hours old
-          PRODS=data.prods||[];
+        const age=(Date.now()-(data.savedAt||0))/1000/60;
+        const prods=data.prods||[];
+        // Only use cache if it has data AND is less than 2 hours old
+        if(age<120 && prods.length>0){
+          PRODS=prods;
           SALES=data.sales||[];
           STAFF=data.staff||[];
           NOTIFS=data.notifs||[];
           updBadges(); checkLowStock();
-          console.log('Loaded from cache ('+Math.round(age)+'min old). 0 Firebase reads.');
+          console.log('Loaded from cache ('+Math.round(age)+'min old).');
           return;
         }
       }
@@ -1393,15 +1411,29 @@ function renderDash(){
   const tR=tS.reduce((a,s)=>a+(s.total||0),0);
   const lw=PRODS.filter(p=>p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold));
   const ot=PRODS.filter(p=>p.quantity===0);
-  // Calculate today's profit = revenue minus cost price
-  let tProfit=0;
-  for(const s of tS){
-    const prod=PRODS.find(p=>p.id===s.productId);
-    const cost=(prod?.costPrice||0)*s.quantity;
-    tProfit+=(s.total||0)-cost;
+  // Calculate profit for all periods
+  function calcProfit(salesList){
+    let p=0;
+    for(const s of salesList){
+      const prod=PRODS.find(x=>x.id===s.productId);
+      const cost=(prod?.costPrice||0)*s.quantity;
+      p+=(s.total||0)-cost;
+    }
+    return Math.round(p*100)/100;
   }
-  tProfit=Math.round(tProfit*100)/100;
-  const profitPct=tR>0?Math.round((tProfit/tR)*100):0;
+  const now2=new Date();
+  const weekStart=new Date(now2);weekStart.setDate(now2.getDate()-now2.getDay());weekStart.setHours(0,0,0,0);
+  const monthStart=new Date(now2.getFullYear(),now2.getMonth(),1);
+  window._profitData={
+    today:calcProfit(tS),
+    week:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=weekStart)),
+    month:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=monthStart)),
+    all:calcProfit(SALES)
+  };
+  window._profitTab=window._profitTab||'today';
+  const tProfit=window._profitData[window._profitTab]||0;
+  const tProfitRev=window._profitTab==='today'?tR:SALES.filter(s=>new Date(s.timestamp)>=(window._profitTab==='week'?weekStart:window._profitTab==='month'?monthStart:new Date(0))).reduce((a,s)=>a+(s.total||0),0);
+  const profitPct=tProfitRev>0?Math.round((tProfit/tProfitRev)*100):0;
 
   g('st-p').textContent=PRODS.length;
   g('st-p-s').textContent=ot.length+' out of stock';
@@ -3273,6 +3305,25 @@ async function refreshPage(){
     if(cur&&map[cur]) map[cur]();
   }
   toast('Data refreshed ✅','s');
+}
+
+// ── PROFIT TAB SWITCHER ─────────────────────────
+function setProfitTab(tab, el){
+  window._profitTab = tab;
+  // Update tab styles
+  document.querySelectorAll('#profit-tabs span').forEach(s=>{
+    s.style.background='var(--bord)'; s.style.color='var(--t3)';
+  });
+  if(el){ el.style.background='#2563EB'; el.style.color='#fff'; }
+  // Recalculate and show
+  const d=window._profitData||{today:0,week:0,month:0,all:0};
+  const profit=d[tab]||0;
+  const labels={today:'Today',week:'This Week',month:'This Month',all:'All Time'};
+  if(g('st-profit')){
+    g('st-profit').textContent=fmt(profit);
+    g('st-profit').style.color=profit>=0?'#059669':'#EF4444';
+  }
+  if(g('st-profit-s')) g('st-profit-s').textContent=labels[tab]+' profit';
 }
 
 console.log('%c Fujup Venture ✓','background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;padding:5px 12px;border-radius:5px;font-weight:700');
