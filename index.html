@@ -3366,20 +3366,21 @@ let EXPENSES = [];
 
 async function loadExpenses(forceRefresh){
   const bid=BID||ME?.buyerId; if(!bid) return;
-  const cKey='fv_cache_'+bid+'_expenses';
-  if(!forceRefresh){
-    try{
-      const c=localStorage.getItem(cKey);
-      if(c){ const d=JSON.parse(c); if(d.length>0){EXPENSES=d;renderExpenses();updateExpSummary();return;} }
-    }catch(e){}
-  }
+  // Always read from Firebase — expenses are small collection, minimal reads
   try{
     const snap=await db.collection('buyers').doc(bid).collection('expenses').get();
     EXPENSES=snap.docs.map(d=>({id:d.id,...d.data(),date:d.data().date||new Date().toISOString()}));
     EXPENSES.sort((a,b)=>new Date(b.date)-new Date(a.date));
-    try{localStorage.setItem(cKey,JSON.stringify(EXPENSES));}catch(e){}
+    try{localStorage.setItem('fv_cache_'+bid+'_expenses',JSON.stringify(EXPENSES));}catch(e){}
     renderExpenses(); updateExpSummary();
-  }catch(e){console.warn('expenses:',e.message);}
+  }catch(e){
+    // Firebase failed — try cache as fallback
+    try{
+      const c=localStorage.getItem('fv_cache_'+bid+'_expenses');
+      if(c){EXPENSES=JSON.parse(c);renderExpenses();updateExpSummary();}
+    }catch(e2){}
+    console.warn('expenses:',e.message);
+  }
 }
 
 function updateExpSummary(){
