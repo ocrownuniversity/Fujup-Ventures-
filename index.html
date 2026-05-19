@@ -935,6 +935,34 @@ tbody tr:hover{background:var(--bg)}
 </div></div>
 
 <!-- Receipt -->
+<!-- Expense Modal -->
+<div id="exp-modal" class="mo h"><div class="mb mb-sm">
+  <div class="mh"><h3>💸 Add Expense</h3><button class="mx" onclick="closeM('exp-modal')">✕</button></div>
+  <div class="mbd">
+    <div id="em-err" class="ferr h"></div>
+    <input type="hidden" id="em-id"/>
+    <div class="fg2"><label class="fl">Description *</label><input class="fc" id="em-desc" placeholder="e.g. Generator fuel"/></div>
+    <div class="fg2"><label class="fl">Category *</label>
+      <select class="fc" id="em-cat">
+        <option value="Rent">🏠 Rent</option>
+        <option value="Salary">👤 Salary</option>
+        <option value="Transport">🚗 Transport</option>
+        <option value="Electricity">💡 Electricity</option>
+        <option value="Water">💧 Water</option>
+        <option value="Generator">⛽ Generator</option>
+        <option value="Feeding">🍽️ Feeding</option>
+        <option value="Packaging">📦 Packaging</option>
+        <option value="Maintenance">🔧 Maintenance</option>
+        <option value="Other">📋 Other</option>
+      </select>
+    </div>
+    <div class="fg2"><label class="fl">Amount (₦) *</label><input class="fc" type="number" id="em-amount" placeholder="0.00" min="0" step="0.01"/></div>
+    <div class="fg2"><label class="fl">Date</label><input class="fc" type="date" id="em-date"/></div>
+    <div class="fg2"><label class="fl">Note (optional)</label><input class="fc" id="em-note" placeholder="Additional details…"/></div>
+  </div>
+  <div class="mf"><button class="btn btn-o" onclick="closeM('exp-modal')">Cancel</button><button class="btn btn-r" onclick="saveExpense()">💾 Save Expense</button></div>
+</div></div>
+
 <div id="rcpt-modal" class="mo h"><div class="mb mb-sm">
   <div class="mh"><h3>🧾 Receipt</h3><button class="mx" onclick="closeM('rcpt-modal')">✕</button></div>
   <div class="mbd" id="rcpt-body"></div>
@@ -3395,12 +3423,14 @@ function renderExpenses(){
   :'<tr><td colspan="7"><div class="empty"><div class="empty-icon">💸</div><div class="empty-sub">No expenses recorded yet</div></div></td></tr>';
 }
 
-function openExpModal(id){
-  g('em-err').classList.add('h');
-  g('em-id').value='';
-  g('em-desc').value=''; g('em-amount').value=''; g('em-note').value='';
-  g('em-cat').value='Rent';
-  g('em-date').value=new Date().toLocaleDateString('en-CA');
+function openExpModal(){
+  const err=g('em-err'); if(err) err.classList.add('h');
+  const eid=g('em-id'); if(eid) eid.value='';
+  const ed=g('em-desc'); if(ed) ed.value='';
+  const ea=g('em-amount'); if(ea) ea.value='';
+  const en=g('em-note'); if(en) en.value='';
+  const ec=g('em-cat'); if(ec) ec.value='Rent';
+  const edt=g('em-date'); if(edt) edt.value=new Date().toLocaleDateString('en-CA');
   openM('exp-modal');
 }
 
