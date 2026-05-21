@@ -944,9 +944,12 @@ tbody tr:hover{background:var(--bg)}
   <div class="mbd">
     <div id="ret-err" class="ferr h"></div>
     <div class="fg2"><label class="fl">Product *</label>
-      <select class="fc" id="ret-prod" onchange="onRetProd()">
-        <option value="">— Select product —</option>
-      </select>
+      <div style="position:relative">
+        <input class="fc" id="ret-prod-search" placeholder="🔍 Type to search product..." autocomplete="off"
+          oninput="filterRetDropdown()" onfocus="showRetDropdown()"/>
+        <input type="hidden" id="ret-prod" data-name="" data-qty=""/>
+        <div id="ret-prod-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surf);border:1.5px solid #2563EB;border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.15)"></div>
+      </div>
     </div>
     <div class="fg2"><label class="fl">Quantity to Return *</label>
       <input class="fc" type="number" id="ret-qty" placeholder="e.g. 2" min="0.5" step="0.5"/>
@@ -3070,8 +3073,33 @@ async function confirmVoid(){
         {quantity:firebase.firestore.FieldValue.increment(s.quantity)});
     });
     await batch.commit();
+    // Update local SALES array immediately so UI reflects void without refresh
+    const voidedIds=sale.receiptId?SALES.filter(s=>s.receiptId===sale.receiptId).map(s=>s.id):[sid];
+    SALES.forEach(s=>{
+      if(voidedIds.includes(s.id)){
+        s.status='voided'; s.voided=true; s.voidReason=reason;
+      }
+    });
+    // Update local PRODS stock
+    const toRestore2=sale.receiptId?SALES.filter(s=>s.receiptId===sale.receiptId):[sale];
+    toRestore2.forEach(s=>{
+      const prod=PRODS.find(p=>p.id===s.productId);
+      if(prod) prod.quantity=Math.round((prod.quantity+s.quantity)*100)/100;
+    });
+    // Update cache
+    try{
+      const cKey='fv_cache_'+b;
+      const c=localStorage.getItem(cKey);
+      if(c){const d=JSON.parse(c);d.sales=SALES;d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}
+    }catch(e){}
     addNotif('info','Sale Voided',sale.productName+' sale voided. Reason: '+reason);
-    closeM('void-modal'); toast('Sale voided. Stock restored.','s');
+    closeM('void-modal');
+    toast('✅ Sale voided. Stock restored.','s');
+    // Refresh current page
+    const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
+    if(cur==='sales') renderSales();
+    if(cur==='dashboard') renderDash();
+    if(cur==='reports') renderRpt();
   }catch(e){toast('Failed: '+e.message,'e');}
 }
 
@@ -3321,32 +3349,76 @@ function renderReturns(){
   :'<tr><td colspan="6"><div class="empty"><div class="empty-icon">↩️</div><div class="empty-sub">No returns recorded yet</div></div></td></tr>';
 }
 
+function filterRetDropdown(){
+  const q=(g('ret-prod-search')?.value||'').toLowerCase().trim();
+  const dd=g('ret-prod-dropdown'); if(!dd) return;
+  const src=PRODS;
+  if(!q){
+    const top=src.slice(0,40);
+    dd.innerHTML=top.map(p=>`<div onclick="selectRetProd('${p.id}','${esc(p.name)}',${p.quantity})"
+      style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bord);font-size:.85rem;display:flex;justify-content:space-between"
+      onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+      <div><div style="font-weight:700;color:var(--navy)">${esc(p.name)}</div>
+      <div style="font-size:.74rem;color:var(--t3)">${p.quantity} ${p.unitType||'units'} in stock</div></div>
+      <div style="font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace;font-size:.84rem">${fmt(p.price||0)}</div>
+    </div>`).join('');
+    dd.style.display=top.length?'block':'none';
+    return;
+  }
+  const matches=src.filter(p=>(p.name||'').toLowerCase().includes(q)).slice(0,40);
+  dd.innerHTML=matches.length?matches.map(p=>`<div onclick="selectRetProd('${p.id}','${esc(p.name)}',${p.quantity})"
+    style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bord);font-size:.85rem;display:flex;justify-content:space-between"
+    onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background=''">
+    <div><div style="font-weight:700;color:var(--navy)">${esc(p.name)}</div>
+    <div style="font-size:.74rem;color:var(--t3)">${p.quantity} ${p.unitType||'units'} in stock</div></div>
+    <div style="font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace;font-size:.84rem">${fmt(p.price||0)}</div>
+  </div>`).join('')
+  :'<div style="padding:12px 14px;color:var(--t3);font-size:.84rem">No products found</div>';
+  dd.style.display='block';
+}
+
+function showRetDropdown(){ filterRetDropdown(); }
+
+function selectRetProd(pid,name,qty){
+  const inp=g('ret-prod-search'); if(inp) inp.value=name;
+  const sel=g('ret-prod'); sel.value=pid; sel.dataset.name=name; sel.dataset.qty=qty;
+  const dd=g('ret-prod-dropdown'); if(dd) dd.style.display='none';
+  g('ret-info').textContent='Current stock: '+qty+' units — returning will ADD to this.';
+  g('ret-info').classList.remove('h');
+}
+
+document.addEventListener('click',e=>{
+  const dd=g('ret-prod-dropdown'),inp=g('ret-prod-search');
+  if(dd&&inp&&!dd.contains(e.target)&&e.target!==inp) dd.style.display='none';
+});
+
 function openReturnModal(){
   if(!can('sale')){toast('No permission','e');return;}
   const b=BID||ME?.buyerId; if(!b){toast('No branch context','e');return;}
   g('ret-err').classList.add('h');
-  g('ret-qty').value=''; g('ret-notes').value=''; g('ret-info').classList.add('h');
+  g('ret-qty').value=''; if(g('ret-notes')) g('ret-notes').value='';
+  g('ret-info').classList.add('h');
   g('ret-reason').value='customer_return';
-  const sel=g('ret-prod');
-  sel.innerHTML='<option value="">— Select product —</option>'+
-    PRODS.map(p=>`<option value="${p.id}" data-name="${esc(p.name)}" data-qty="${p.quantity}">${esc(p.name)} (${p.quantity} in stock)</option>`).join('');
+  const inp=g('ret-prod-search'); if(inp) inp.value='';
+  const sel=g('ret-prod'); if(sel){sel.value='';sel.dataset.name='';sel.dataset.qty='';}
+  const dd=g('ret-prod-dropdown'); if(dd) dd.style.display='none';
   openM('return-modal');
 }
 
 function onRetProd(){
-  const sel=g('ret-prod'),opt=sel.options[sel.selectedIndex];
-  if(!opt.value){g('ret-info').classList.add('h');return;}
-  g('ret-info').textContent='Current stock: '+opt.dataset.qty+' units — returning will ADD to this.';
+  const sel=g('ret-prod');
+  if(!sel.value){g('ret-info').classList.add('h');return;}
+  g('ret-info').textContent='Current stock: '+(sel.dataset.qty||0)+' units — returning will ADD to this.';
   g('ret-info').classList.remove('h');
 }
 
 async function saveReturn(){
   const b=BID||ME?.buyerId; if(!b) return;
-  const sel=g('ret-prod'),opt=sel.options[sel.selectedIndex];
-  if(!opt.value) return ferr('ret-err','Select a product.');
+  const sel=g('ret-prod');
+  if(!sel.value) return ferr('ret-err','Select a product first.');
   const qty=parseFloat(g('ret-qty').value);
   if(!qty||qty<=0) return ferr('ret-err','Enter a valid quantity.');
-  const pid=opt.value, pname=opt.dataset.name;
+  const pid=sel.value, pname=sel.dataset.name||(g('ret-prod-search')?.value||'Product');
   const reason=g('ret-reason').value, notes=g('ret-notes').value.trim();
   const reasonLabels={customer_return:'Customer Return',damaged:'Damaged/Defective',wrong_item:'Wrong Item',expired:'Expired',other:'Other'};
   try{
