@@ -1102,8 +1102,8 @@ const EMOJI  = {Medicine:'💊',Supplements:'💪',Hygiene:'🧴',Dairy:'🥛',B
 const PERMS = {
   admin:      {prod:true, del:true, sale:true, rpt:true, staff:true, cfg:true},
   manager:    {prod:true, del:true, sale:true, rpt:true, staff:false,cfg:false},
-  cashier:    {prod:false,del:false,sale:true, rpt:false,staff:false,cfg:false},
-  staff:      {prod:false,del:false,sale:true, rpt:false,staff:false,cfg:false},
+  cashier:    {prod:false,del:false,sale:true, rpt:true, staff:false,cfg:false},
+  staff:      {prod:false,del:false,sale:true, rpt:true, staff:false,cfg:false},
   accountant: {prod:false,del:false,sale:false,rpt:true, staff:false,cfg:false},
 };
 function can(p){ if(SA_MODE) return true; return !!(PERMS[ME?.role||'cashier']?.[p]); }
