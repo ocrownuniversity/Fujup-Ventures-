@@ -560,6 +560,40 @@ tbody tr:hover{background:var(--bg)}
         <div class="sc"><div><div class="label">Avg Order</div><div class="value" id="rpt-a">₦0</div></div></div>
         <div class="sc"><div><div class="label">Units Sold</div><div class="value" id="rpt-u">0</div></div></div>
       </div>
+      <!-- Payment Method Breakdown -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-head"><h3>💳 Payment Method Breakdown</h3></div>
+        <div class="card-body" style="padding:12px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">
+            <div style="background:#F0FDF4;border-radius:10px;padding:12px;text-align:center;border:1px solid #BBF7D0">
+              <div style="font-size:1.4rem;margin-bottom:4px">💵</div>
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#059669;margin-bottom:4px">Cash</div>
+              <div style="font-size:1rem;font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace" id="rpt-cash">₦0</div>
+              <div style="font-size:.7rem;color:#6B7280;margin-top:2px" id="rpt-cash-c">0 sales</div>
+            </div>
+            <div style="background:#EFF6FF;border-radius:10px;padding:12px;text-align:center;border:1px solid #BFDBFE">
+              <div style="font-size:1.4rem;margin-bottom:4px">🏦</div>
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2563EB;margin-bottom:4px">Transfer</div>
+              <div style="font-size:1rem;font-weight:800;color:#2563EB;font-family:'JetBrains Mono',monospace" id="rpt-transfer">₦0</div>
+              <div style="font-size:.7rem;color:#6B7280;margin-top:2px" id="rpt-transfer-c">0 sales</div>
+            </div>
+            <div style="background:#F5F3FF;border-radius:10px;padding:12px;text-align:center;border:1px solid #DDD6FE">
+              <div style="font-size:1.4rem;margin-bottom:4px">💳</div>
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#7C3AED;margin-bottom:4px">POS / ATM</div>
+              <div style="font-size:1rem;font-weight:800;color:#7C3AED;font-family:'JetBrains Mono',monospace" id="rpt-pos">₦0</div>
+              <div style="font-size:.7rem;color:#6B7280;margin-top:2px" id="rpt-pos-c">0 sales</div>
+            </div>
+            <div style="background:#FFFBEB;border-radius:10px;padding:12px;text-align:center;border:1px solid #FDE68A">
+              <div style="font-size:1.4rem;margin-bottom:4px">📋</div>
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#D97706;margin-bottom:4px">Credit</div>
+              <div style="font-size:1rem;font-weight:800;color:#D97706;font-family:'JetBrains Mono',monospace" id="rpt-credit">₦0</div>
+              <div style="font-size:.7rem;color:#6B7280;margin-top:2px" id="rpt-credit-c">0 sales</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sg" style="display:none"><!-- spacer -->
+      </div>
       <div id="rpt-grid" style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
         <div class="card"><div class="card-head"><h3>Revenue Trend</h3></div><div class="card-body"><canvas id="rpt-chart" height="190"></canvas></div></div>
         <div class="card"><div class="card-head"><h3>🏆 Top Products</h3></div><div class="card-body" id="rpt-tops"></div></div>
@@ -2000,6 +2034,30 @@ function renderRpt(){
   const rev=list.reduce((a,s)=>a+(s.total||0),0), units=list.reduce((a,s)=>a+(s.quantity||0),0);
   g('rpt-s').textContent=list.length; g('rpt-r').textContent=fmt(rev);
   g('rpt-a').textContent=fmt(list.length?rev/list.length:0); g('rpt-u').textContent=units;
+
+  // Payment method breakdown
+  const payTotals={cash:0,transfer:0,pos:0,credit:0};
+  const payCounts={cash:0,transfer:0,pos:0,credit:0};
+  for(const s of list){
+    if(s.splitPayments&&s.splitPayments.length>0){
+      for(const sp of s.splitPayments){
+        const t=(sp.type||'cash').toLowerCase();
+        const k=t==='pos'||t==='atm'?'pos':t==='transfer'?'transfer':t==='credit'?'credit':'cash';
+        payTotals[k]=(payTotals[k]||0)+sp.amount;
+        payCounts[k]=(payCounts[k]||0)+1;
+      }
+    }else{
+      const t=(s.paymentType||'cash').toLowerCase();
+      const k=t==='pos'||t==='atm'?'pos':t==='transfer'?'transfer':t==='credit'?'credit':'cash';
+      payTotals[k]=(payTotals[k]||0)+(s.total||0);
+      payCounts[k]=(payCounts[k]||0)+1;
+    }
+  }
+  const setP=(id,val,cnt)=>{if(g(id)){g(id).textContent=fmt(val);const c=g(id+'-c');if(c)c.textContent=cnt+' sale'+(cnt!==1?'s':'');}};
+  setP('rpt-cash',payTotals.cash,payCounts.cash);
+  setP('rpt-transfer',payTotals.transfer,payCounts.transfer);
+  setP('rpt-pos',payTotals.pos,payCounts.pos);
+  setP('rpt-credit',payTotals.credit,payCounts.credit);
   const mp={}; list.forEach(s=>{mp[s.productName]=(mp[s.productName]||0)+s.quantity;});
   const tops=Object.entries(mp).sort((a,b)=>b[1]-a[1]).slice(0,5), maxQ=tops[0]?tops[0][1]:1;
   g('rpt-tops').innerHTML=tops.length?tops.map(([n,q],i)=>`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:.81rem;font-weight:600;margin-bottom:3px"><span>${['🥇','🥈','🥉','4️⃣','5️⃣'][i]} ${esc(n)}</span><span style="color:var(--t3)">${q}</span></div><div class="prog-w"><div class="prog-b" style="width:${(q/maxQ*100).toFixed(0)}%;background:${COLORS[i%COLORS.length]}"></div></div></div>`).join('')
