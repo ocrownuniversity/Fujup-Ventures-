@@ -1497,7 +1497,7 @@ function exitCtx(){
 function renderDash(){
   if(SA_MODE && !BID){ renderSADash(); return; }
   const today=new Date().toDateString();
-  const tS=SALES.filter(s=>new Date(s.timestamp).toDateString()===today);
+  const tS=SALES.filter(s=>new Date(s.timestamp).toDateString()===today&&s.status!=='voided'&&!s.voided);
   const tR=tS.reduce((a,s)=>a+(s.total||0),0);
   const lw=PRODS.filter(p=>p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold));
   const ot=PRODS.filter(p=>p.quantity===0);
@@ -1517,9 +1517,9 @@ function renderDash(){
   const exp=window._expenseData||{today:0,week:0,month:0,all:0};
   window._profitData={
     today:calcProfit(tS)-exp.today,
-    week:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=weekStart))-exp.week,
-    month:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=monthStart))-exp.month,
-    all:calcProfit(SALES)-exp.all
+    week:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=weekStart&&s.status!=='voided'&&!s.voided))-exp.week,
+    month:calcProfit(SALES.filter(s=>new Date(s.timestamp)>=monthStart&&s.status!=='voided'&&!s.voided))-exp.month,
+    all:calcProfit(SALES.filter(s=>s.status!=='voided'&&!s.voided))-exp.all
   };
   window._profitTab=window._profitTab||'today';
   const tProfit=window._profitData[window._profitTab]||0;
@@ -2033,7 +2033,7 @@ function renderRpt(){
   else if(RPT_MODE==='weekly'){start=new Date(now);start.setDate(now.getDate()-now.getDay());start.setHours(0,0,0,0);}
   else if(RPT_MODE==='monthly') start=new Date(now.getFullYear(),now.getMonth(),1);
   else start=new Date(0);
-  const list=SALES.filter(s=>new Date(s.timestamp)>=start).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  const list=SALES.filter(s=>new Date(s.timestamp)>=start&&s.status!=='voided'&&!s.voided).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   const rev=list.reduce((a,s)=>a+(s.total||0),0), units=list.reduce((a,s)=>a+(s.quantity||0),0);
   g('rpt-s').textContent=list.length; g('rpt-r').textContent=fmt(rev);
   g('rpt-a').textContent=fmt(list.length?rev/list.length:0); g('rpt-u').textContent=units;
@@ -2112,7 +2112,7 @@ function renderNotifs(){
 async function markRead(id){ const b=BID||ME?.buyerId; if(!b)return; try{ await db.collection('buyers').doc(b).collection('notifications').doc(id).update({read:true}); }catch(e){} }
 async function markAllRead(){ const b=BID||ME?.buyerId; if(!b)return; const batch=db.batch(); NOTIFS.filter(n=>!n.read).forEach(n=>batch.update(db.collection('buyers').doc(b).collection('notifications').doc(n.id),{read:true})); try{await batch.commit();toast('All read','s');}catch(e){} }
 function checkLowStock(){ const cb=BID||ME?.buyerId; if(!cb)return; PRODS.filter(p=>p.quantity<=(p.lowAt||CFG.threshold)).forEach(p=>{ const exists=NOTIFS.some(n=>!n.read&&n.text?.includes(p.name)); if(!exists) addNotif('warn','Low Stock',p.name+' is low ('+p.quantity+' units).'); }); }
-function updBadges(){ const u=NOTIFS.filter(n=>!n.read).length; const ts=SALES.filter(s=>new Date(s.timestamp).toDateString()===new Date().toDateString()).length; g('sb-notif').textContent=u||''; g('sb-sales').textContent=ts||''; u>0?g('tb-ndot').classList.remove('h'):g('tb-ndot').classList.add('h'); }
+function updBadges(){ const u=NOTIFS.filter(n=>!n.read).length; const ts=SALES.filter(s=>new Date(s.timestamp).toDateString()===new Date().toDateString()&&s.status!=='voided'&&!s.voided).length; g('sb-notif').textContent=u||''; g('sb-sales').textContent=ts||''; u>0?g('tb-ndot').classList.remove('h'):g('tb-ndot').classList.add('h'); }
 
 // ── STAFF ──────────────────────────────────────────
 function renderStaff(){
