@@ -322,6 +322,7 @@ tbody tr:hover{background:var(--bg)}
   .sg{grid-template-columns:1fr 1fr}
   .pg-grid{grid-template-columns:1fr}
   .sc-icon{width:38px;height:38px;font-size:1.1rem}
+  #inv-val-panel{grid-template-columns:1fr!important}
 }
 @media print{.sb,.topbar,.toast-w{display:none!important}.main{margin:0!important}}
 
@@ -523,6 +524,33 @@ tbody tr:hover{background:var(--bg)}
         <div class="srch"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="ps" placeholder="Search…" oninput="renderProds()"/></div>
         <select class="fsel" id="pc" onchange="renderProds()"><option value="">All Categories</option></select>
         <select class="fsel" id="psort" onchange="renderProds()"><option value="name">A–Z</option><option value="price">Price</option><option value="qty">Quantity</option></select>
+      </div>
+      <!-- Inventory Valuation Summary — Super Admin only -->
+      <div id="inv-val-panel" style="display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+        <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:13px">
+          <div style="width:44px;height:44px;background:#D1FAE5;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">🏷️</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#059669;margin-bottom:3px">Total Cost Price</div>
+            <div id="sv-cost" style="font-size:1.25rem;font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace">&#8358;0</div>
+            <div id="sv-cost-sub" style="font-size:.7rem;color:#6B7280;margin-top:3px">Value of stock at cost</div>
+          </div>
+        </div>
+        <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:13px">
+          <div style="width:44px;height:44px;background:#DBEAFE;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">&#128176;</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#2563EB;margin-bottom:3px">Total Selling Price</div>
+            <div id="sv-sell" style="font-size:1.25rem;font-weight:800;color:#2563EB;font-family:'JetBrains Mono',monospace">&#8358;0</div>
+            <div id="sv-sell-sub" style="font-size:.7rem;color:#6B7280;margin-top:3px">Value of stock at retail</div>
+          </div>
+        </div>
+        <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:13px">
+          <div style="width:44px;height:44px;background:#FFEDD5;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">&#128200;</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#D97706;margin-bottom:3px">Potential Profit</div>
+            <div id="sv-profit" style="font-size:1.25rem;font-weight:800;color:#D97706;font-family:'JetBrains Mono',monospace">&#8358;0</div>
+            <div id="sv-profit-sub" style="font-size:.7rem;color:#6B7280;margin-top:3px">If all stock is sold</div>
+          </div>
+        </div>
       </div>
       <div class="pg-grid" id="prod-grid"></div>
     </div>
@@ -1529,10 +1557,11 @@ function nav(pg){
   const titles={dashboard:'Dashboard',products:'Products',sales:'Sales',reports:'Reports',alerts:'Alerts',staff:'Staff',buyers:'Branches',returns:'Returns',settings:'Settings',customers:'Customers'};
   g('tb-title').textContent=titles[pg]||pg;
   // Render from cache immediately (instant), then refresh data in background
-  const renderMap={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff,buyers:renderBuyers,returns:renderReturns,customers:renderCustomers};
+  const renderMap={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt,alerts:renderNotifs,staff:renderStaff,buyers:renderBuyers,returns:renderReturns,customers:renderCustomers,credits:()=>{renderCreditPayments();renderCreditSummary();}};
   if(renderMap[pg]) renderMap[pg](); // instant render from cache
   // Only load customers fresh when navigating (small collection)
   if(pg==='customers') subscribeCustomers();
+  if(pg==='credits') loadCreditPayments();
   closeSB();
 }
 function loadPage(pg){ nav(pg); }
@@ -1654,11 +1683,22 @@ function renderProds(){
   let list=PRODS.filter(p=>(!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q))&&(!cat||p.category===cat));
   list.sort((a,b)=>srt==='price'?a.price-b.price:srt==='qty'?a.quantity-b.quantity:a.name.localeCompare(b.name));
   g('prod-sub').textContent=list.length+' of '+PRODS.length+' products';
-  // Stock valuation
-  const totalCost=PRODS.reduce((a,p)=>a+((p.costPrice||0)*(p.quantity||0)),0);
-  const totalSell=PRODS.reduce((a,p)=>a+((p.price||0)*(p.quantity||0)),0);
-  if(g('sv-cost')) g('sv-cost').textContent=fmt(Math.round(totalCost*100)/100);
-  if(g('sv-sell')) g('sv-sell').textContent=fmt(Math.round(totalSell*100)/100);
+  // Stock valuation — Super Admin only
+  const valPanel=g('inv-val-panel');
+  if(valPanel) valPanel.style.display=(SA_MODE)?'grid':'none';
+  if(SA_MODE){
+    const valuedProds=PRODS.filter(p=>p.price>0&&p.quantity>0);
+    const costProds=PRODS.filter(p=>(p.costPrice||0)>0&&p.quantity>0);
+    const totalCost=costProds.reduce((a,p)=>a+((p.costPrice||0)*(p.quantity||0)),0);
+    const totalSell=valuedProds.reduce((a,p)=>a+((p.price||0)*(p.quantity||0)),0);
+    const totalProfit=totalSell-totalCost;
+    if(g('sv-cost')) g('sv-cost').textContent=fmt(Math.round(totalCost*100)/100);
+    if(g('sv-sell')) g('sv-sell').textContent=fmt(Math.round(totalSell*100)/100);
+    if(g('sv-profit')){g('sv-profit').textContent=fmt(Math.round(totalProfit*100)/100);g('sv-profit').style.color=totalProfit>=0?'#D97706':'#EF4444';}
+    if(g('sv-cost-sub')) g('sv-cost-sub').textContent=costProds.length+' of '+PRODS.length+' products have cost price';
+    if(g('sv-sell-sub')) g('sv-sell-sub').textContent=valuedProds.length+' products with stock';
+    if(g('sv-profit-sub')) g('sv-profit-sub').textContent=costProds.length<PRODS.length?'⚠️ '+(PRODS.length-costProds.length)+' products missing cost price':'Based on all products';
+  }
   // Cat filter
   const cats=[...new Set(PRODS.map(p=>p.category).filter(Boolean))].sort();
   const cf=g('pc'); if(cf){const cv=cf.value;cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option value="${esc(c)}"${c===cv?' selected':''}>${esc(c)}</option>`).join('');}
@@ -2130,13 +2170,15 @@ function renderRpt(){
   else if(RPT_MODE==='monthly') start=new Date(now.getFullYear(),now.getMonth(),1);
   else start=new Date(0);
   // Single source of truth — all report sections use THIS list
+  // Use saleDate (user-chosen date) first, fall back to timestamp
   const list=SALES.filter(s=>{
-    const t=new Date(s.timestamp);
+    const t=new Date(s.saleDate||s.timestamp);
+    if(isNaN(t.getTime())) return false;
     if(t<start) return false;
     if(end&&t>end) return false;
     if(s.status==='voided'||s.voided) return false;
     return true;
-  }).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  }).sort((a,b)=>new Date(b.saleDate||b.timestamp)-new Date(a.saleDate||a.timestamp));
   const units=list.reduce((a,s)=>a+(s.quantity||0),0);
   const seenR=new Set(); let rev=0,salesCount=0;
   for(const s of list){
@@ -2163,7 +2205,7 @@ function renderRpt(){
       for(const sp of s.splitPayments){
         const t=(sp.type||'cash').toLowerCase();
         const k=t==='pos'||t==='atm'?'pos':t==='transfer'?'transfer':t==='credit'?'credit':'cash';
-        payTotals[k]=Math.round((payTotals[k]||0+sp.amount)*100)/100;
+        payTotals[k]=Math.round(((payTotals[k]||0)+sp.amount)*100)/100;
         payCounts[k]=(payCounts[k]||0)+1;
       }
     }else{
@@ -2666,7 +2708,7 @@ function onSP(){
   g('sm-qty').max=stock;
   g('sm-qty').step=unitsPerPack>1?'0.25':'1';
   g('sm-info').textContent=stock+' in stock · Default price: '+fmt(price)+(unitsPerPack>1?' · '+unitsPerPack+' units/pack':'');
-  if(g('sm-custom-price')){ g('sm-custom-price').value=''; g('sm-custom-price').placeholder=price.toFixed(2); }
+  if(g('sm-custom-price')){ g('sm-custom-price').placeholder=defaultPrice.toFixed(2); }
   g('sm-info').classList.remove('h');
   buildHalfBtns(unitsPerPack);
 }
@@ -2679,7 +2721,9 @@ function addToCart(){
   const qty=parseFloat(g('sm-qty').value);
   if(!qty||qty<=0){ toast('Enter a valid quantity','w'); return; }
 
-  const price=parseFloat(sel.dataset.p||0);
+  const defaultPrice=parseFloat(sel.dataset.p||0);
+  const customPriceInput=parseFloat(g('sm-custom-price')?.value||0);
+  const price=customPriceInput>0?customPriceInput:defaultPrice;
   const stock=parseInt(sel.dataset.q||0);
   const name=(g('sm-prod-search')?.value||'').split(' (')[0].trim()||pid;
   const prod=PRODS.find(p=>p.id===pid);
@@ -3153,7 +3197,13 @@ function buildSaleRows(list){
 function renderSales(){
   const list=getFilteredSales();
   const nonVoided=list.filter(s=>s.status!=='voided'&&!s.voided);
-  const totalRev=nonVoided.reduce((a,s)=>a+(s.grandTotal||s.total||0),0);
+  // Deduplicate by receiptId so multi-item receipts are counted once
+  const seenRevIds=new Set(); let totalRev=0;
+  for(const s of nonVoided){
+    if(s.receiptId){ if(seenRevIds.has(s.receiptId)) continue; seenRevIds.add(s.receiptId); }
+    totalRev+=s.grandTotal||s.total||0;
+  }
+  totalRev=Math.round(totalRev*100)/100;
 
   // Summary bar
   const fromD=g('sd-from')?.value||'', toD=g('sd-to')?.value||'';
@@ -3162,7 +3212,7 @@ function renderSales(){
     sds.style.display='flex';
     const lbl=fromD&&fromD===toD?new Date(fromD).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}):fromD&&toD?fromD+' → '+toD:fromD?'From '+fromD:'All Sales';
     if(g('sds-label')) g('sds-label').textContent=lbl;
-    if(g('sds-count')) g('sds-count').textContent=nonVoided.length;
+    if(g('sds-count')) g('sds-count').textContent=seenRevIds.size+nonVoided.filter(s=>!s.receiptId).length;
     if(g('sds-rev'))   g('sds-rev').textContent=fmt(totalRev);
   }
 
@@ -3232,52 +3282,67 @@ async function confirmVoid(){
   const notes=g('void-notes').value.trim();
   const b=BID||ME?.buyerId; if(!b||!sid) return;
   const sale=SALES.find(x=>x.id===sid); if(!sale) return;
+
+  // Collect all sales in this receipt group (or just the one sale)
+  const allToVoid=sale.receiptId
+    ?SALES.filter(s=>s.receiptId===sale.receiptId)
+    :[sale];
+
+  // Separate local-only sales (never reached Firebase) from Firebase sales
+  const isLocal=id=>id.startsWith('local-');
+  const fbSales=allToVoid.filter(s=>!isLocal(s.id));
+  const localSales=allToVoid.filter(s=>isLocal(s.id));
+
   try{
-    const batch=db.batch();
-    // Mark sale as voided
-    batch.update(db.collection('buyers').doc(b).collection('sales').doc(sid),{
-      status:'voided', voidReason:reason, voidNotes:notes,
-      voidedBy:ME.name||'Staff', voidedAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-    // Also void any siblings with same receiptId
-    if(sale.receiptId){
-      SALES.filter(s=>s.receiptId===sale.receiptId&&s.id!==sid).forEach(s=>{
+    // Only batch-update sales that actually exist in Firebase
+    if(fbSales.length>0){
+      const batch=db.batch();
+      fbSales.forEach(s=>{
         batch.update(db.collection('buyers').doc(b).collection('sales').doc(s.id),{
-          status:'voided', voidReason:reason, voidNotes:notes, voidedBy:ME.name||'Staff',
-          voidedAt:firebase.firestore.FieldValue.serverTimestamp()
+          status:'voided', voidReason:reason, voidNotes:notes,
+          voidedBy:ME.name||'Staff', voidedAt:firebase.firestore.FieldValue.serverTimestamp()
         });
       });
+      // Restore stock in Firebase for Firebase sales only
+      fbSales.forEach(s=>{
+        batch.update(db.collection('buyers').doc(b).collection('products').doc(s.productId),
+          {quantity:firebase.firestore.FieldValue.increment(s.quantity)});
+      });
+      await batch.commit();
     }
-    // Restore stock
-    const toRestore=sale.receiptId?SALES.filter(s=>s.receiptId===sale.receiptId):[sale];
-    toRestore.forEach(s=>{
-      batch.update(db.collection('buyers').doc(b).collection('products').doc(s.productId),
-        {quantity:firebase.firestore.FieldValue.increment(s.quantity)});
-    });
-    await batch.commit();
-    // Update local SALES array immediately so UI reflects void without refresh
-    const voidedIds=sale.receiptId?SALES.filter(s=>s.receiptId===sale.receiptId).map(s=>s.id):[sid];
+
+    // Mark ALL (including local-only) as voided in the local SALES array
+    const voidedIds=allToVoid.map(s=>s.id);
     SALES.forEach(s=>{
       if(voidedIds.includes(s.id)){
-        s.status='voided'; s.voided=true; s.voidReason=reason;
+        s.status='voided'; s.voided=true; s.voidReason=reason; s.voidNotes=notes;
+        s.voidedBy=ME.name||'Staff';
       }
     });
-    // Update local PRODS stock
-    const toRestore2=sale.receiptId?SALES.filter(s=>s.receiptId===sale.receiptId):[sale];
-    toRestore2.forEach(s=>{
+
+    // Restore stock locally for ALL sales in the group (including local-only)
+    allToVoid.forEach(s=>{
       const prod=PRODS.find(p=>p.id===s.productId);
       if(prod) prod.quantity=Math.round((prod.quantity+s.quantity)*100)/100;
     });
+
+    // For local-only sales, also remove them from the offline queue so they don't sync later
+    if(localSales.length>0){
+      OFFLINE_QUEUE=OFFLINE_QUEUE.filter(op=>!localSales.some(s=>s.id===op.id));
+      try{ localStorage.setItem('fv_offline_queue',JSON.stringify(OFFLINE_QUEUE)); }catch(e){}
+    }
+
     // Update cache
     try{
       const cKey='fv_cache_'+b;
       const c=localStorage.getItem(cKey);
       if(c){const d=JSON.parse(c);d.sales=SALES;d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}
     }catch(e){}
+
     addNotif('info','Sale Voided',sale.productName+' sale voided. Reason: '+reason);
     closeM('void-modal');
-    toast('✅ Sale voided. Stock restored.','s');
-    // Refresh current page
+    const offlineNote=localSales.length>0?' (offline sale — stock restored locally)':'';
+    toast('✅ Sale voided. Stock restored.'+offlineNote,'s');
     const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
     if(cur==='sales') renderSales();
     if(cur==='dashboard') renderDash();
@@ -3319,11 +3384,27 @@ renderProds=function(){
   let list=PRODS.filter(p=>(!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q))&&(!cat||p.category===cat));
   list.sort((a,b)=>srt==='price'?a.price-b.price:srt==='qty'?a.quantity-b.quantity:a.name.localeCompare(b.name));
   g('prod-sub').textContent=list.length+' of '+PRODS.length+' products';
-  // Stock valuation
-  const totalCost=PRODS.reduce((a,p)=>a+((p.costPrice||0)*(p.quantity||0)),0);
-  const totalSell=PRODS.reduce((a,p)=>a+((p.price||0)*(p.quantity||0)),0);
-  if(g('sv-cost')) g('sv-cost').textContent=fmt(Math.round(totalCost*100)/100);
-  if(g('sv-sell')) g('sv-sell').textContent=fmt(Math.round(totalSell*100)/100);
+  // Stock valuation — visible to Super Admin only
+  const valPanel=g('inv-val-panel');
+  if(valPanel) valPanel.style.display=(SA_MODE)?'grid':'none';
+  if(SA_MODE){
+    // Only count products that have BOTH price and costPrice set (non-zero)
+    const valuedProds=PRODS.filter(p=>p.price>0&&p.quantity>0);
+    const costProds=PRODS.filter(p=>(p.costPrice||0)>0&&p.quantity>0);
+    const totalCost=costProds.reduce((a,p)=>a+((p.costPrice||0)*(p.quantity||0)),0);
+    const totalSell=valuedProds.reduce((a,p)=>a+((p.price||0)*(p.quantity||0)),0);
+    const totalProfit=totalSell-totalCost;
+    if(g('sv-cost')) g('sv-cost').textContent=fmt(Math.round(totalCost*100)/100);
+    if(g('sv-sell')) g('sv-sell').textContent=fmt(Math.round(totalSell*100)/100);
+    if(g('sv-profit')){
+      g('sv-profit').textContent=fmt(Math.round(totalProfit*100)/100);
+      g('sv-profit').style.color=totalProfit>=0?'#D97706':'#EF4444';
+    }
+    // Sub-labels showing product count used
+    if(g('sv-cost-sub')) g('sv-cost-sub').textContent=costProds.length+' of '+PRODS.length+' products have cost price';
+    if(g('sv-sell-sub')) g('sv-sell-sub').textContent=valuedProds.length+' products with stock';
+    if(g('sv-profit-sub')) g('sv-profit-sub').textContent=costProds.length<PRODS.length?'⚠️ '+( PRODS.length-costProds.length)+' products missing cost price':'Based on all products';
+  }
   const cats=[...new Set(PRODS.map(p=>p.category).filter(Boolean))].sort();
   const cf=g('pc'); if(cf){const cv=cf.value;cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option value="${esc(c)}"${c===cv?' selected':''}>${esc(c)}</option>`).join('');}
   const dl=g('cat-dl'); if(dl) dl.innerHTML=cats.map(c=>`<option value="${esc(c)}">`).join('');
@@ -3473,6 +3554,8 @@ function queueOp(op){
   OFFLINE_QUEUE.push({...op, queuedAt:Date.now()});
   localStorage.setItem('fv_offline_queue', JSON.stringify(OFFLINE_QUEUE));
   console.log('Queued offline op:', op.type);
+  updateSyncBtn();
+  startAutoSync(); // begin auto-retry if not already running
 }
 
 async function syncOfflineQueue(){
@@ -3646,20 +3729,55 @@ startClock();
 // ── SYNC OFFLINE QUEUE ───────────────────────────
 async function trySyncQueue(){
   if(!OFFLINE_QUEUE.length){ toast('Nothing to sync','i'); return; }
-  toast('Syncing '+OFFLINE_QUEUE.length+' offline items...','i');
+  toast('Syncing '+OFFLINE_QUEUE.length+' offline item'+(OFFLINE_QUEUE.length!==1?'s':'')+'...','i');
   await syncOfflineQueue();
-  // Refresh cache after sync
+  // Refresh cache and UI after sync
   if(BID) await loadBranchData(true);
   const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
-  const map={dashboard:renderDash,products:renderProds,sales:renderSales};
+  const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt};
   if(cur&&map[cur]) map[cur]();
 }
 
 function updateSyncBtn(){
   const btn=document.getElementById('sync-btn');
-  if(btn) btn.style.display=OFFLINE_QUEUE.length>0?'inline-flex':'none';
-  if(btn&&OFFLINE_QUEUE.length>0) btn.textContent='☁️ Sync ('+OFFLINE_QUEUE.length+' pending)';
+  if(!btn) return;
+  const n=OFFLINE_QUEUE.length;
+  btn.style.display=n>0?'inline-flex':'none';
+  if(n>0) btn.textContent='☁️ Sync ('+n+' pending)';
 }
+
+// ── AUTO-SYNC — runs every 5 minutes when there are queued items ──
+let _autoSyncInterval=null;
+function startAutoSync(){
+  if(_autoSyncInterval) return; // already running
+  _autoSyncInterval=setInterval(async()=>{
+    if(!OFFLINE_QUEUE.length){ stopAutoSync(); return; }
+    console.log('[AutoSync] Attempting to sync',OFFLINE_QUEUE.length,'queued items...');
+    const before=OFFLINE_QUEUE.length;
+    await syncOfflineQueue();
+    const after=OFFLINE_QUEUE.length;
+    updateSyncBtn();
+    if(after<before){
+      // Some items synced — refresh the current page silently
+      if(BID){
+        try{ await loadBranchData(true); }catch(e){}
+        const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
+        const map={dashboard:renderDash,products:renderProds,sales:renderSales,reports:renderRpt};
+        if(cur&&map[cur]) map[cur]();
+      }
+      if(after===0){
+        stopAutoSync();
+        toast('☁️ All offline data synced to Firebase!','s');
+      }
+    }
+  }, 5*60*1000); // every 5 minutes
+  console.log('[AutoSync] Started — will retry every 5 minutes');
+}
+function stopAutoSync(){
+  if(_autoSyncInterval){ clearInterval(_autoSyncInterval); _autoSyncInterval=null; }
+}
+// Kick off auto-sync on page load if there's anything queued
+if(OFFLINE_QUEUE.length>0) startAutoSync();
 
 // ── MANUAL REFRESH ──────────────────────────────
 async function refreshPage(){
@@ -3800,12 +3918,27 @@ async function loadCreditPayments(){
 }
 
 function renderCreditSummary(){
-  // Total owed = all credit sales
-  const creditSales=SALES.filter(s=>(s.paymentType||'').toLowerCase()==='credit'&&s.status!=='voided'&&!s.voided);
+  // Credit sales = paymentType is credit OR any splitPayments entry is credit
+  const creditSales=SALES.filter(s=>{
+    if(s.status==='voided'||s.voided) return false;
+    const pt=(s.paymentType||'').toLowerCase();
+    if(pt==='credit') return true;
+    // Also catch split payments that include credit
+    if(s.splitPayments&&s.splitPayments.some(sp=>(sp.type||'').toLowerCase()==='credit')) return true;
+    return false;
+  });
+  // Deduplicate by receiptId — use a single Set across all sales
   const seenC=new Set(); let totalOwed=0;
   for(const s of creditSales){
     if(s.receiptId){ if(seenC.has(s.receiptId)) continue; seenC.add(s.receiptId); }
-    totalOwed+=s.grandTotal||s.total||0;
+    // For split payments, only count the credit portion
+    let amount=0;
+    if(s.splitPayments&&s.splitPayments.length>0){
+      amount=s.splitPayments.filter(sp=>(sp.type||'').toLowerCase()==='credit').reduce((a,sp)=>a+(sp.amount||0),0);
+    } else {
+      amount=s.grandTotal||s.total||0;
+    }
+    totalOwed+=amount;
   }
   const totalPaid=CREDIT_PAYMENTS.reduce((a,p)=>a+(p.amount||0),0);
   const balance=Math.max(totalOwed-totalPaid,0);
@@ -3813,18 +3946,25 @@ function renderCreditSummary(){
   if(g('cr-total-paid')) g('cr-total-paid').textContent=fmt(Math.round(totalPaid*100)/100);
   if(g('cr-balance'))    g('cr-balance').textContent=fmt(Math.round(balance*100)/100);
 
-  // Build per-customer summary
+  // Build per-customer summary — use a single seen set per customer loop
   const custMap={};
+  const seenForCust=new Set();
   creditSales.forEach(s=>{
     const c=s.customer||'Unknown';
-    if(!custMap[c]) custMap[c]={owed:0,paid:0};
-    const seen2=new Set();
-    if(s.receiptId){ if(seen2.has(s.receiptId)) return; seen2.add(s.receiptId); }
-    custMap[c].owed+=s.grandTotal||s.total||0;
+    if(!custMap[c]) custMap[c]={owed:0,paid:0,sales:[]};
+    if(s.receiptId){ if(seenForCust.has(s.receiptId)) return; seenForCust.add(s.receiptId); }
+    let amount=0;
+    if(s.splitPayments&&s.splitPayments.length>0){
+      amount=s.splitPayments.filter(sp=>(sp.type||'').toLowerCase()==='credit').reduce((a,sp)=>a+(sp.amount||0),0);
+    } else {
+      amount=s.grandTotal||s.total||0;
+    }
+    custMap[c].owed+=amount;
+    custMap[c].sales.push(s.productName||'');
   });
   CREDIT_PAYMENTS.forEach(p=>{
     const c=p.customer||'Unknown';
-    if(!custMap[c]) custMap[c]={owed:0,paid:0};
+    if(!custMap[c]) custMap[c]={owed:0,paid:0,sales:[]};
     custMap[c].paid+=p.amount||0;
   });
   const el=g('cr-customer-list');
