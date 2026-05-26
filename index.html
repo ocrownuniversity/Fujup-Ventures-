@@ -539,20 +539,34 @@ tbody tr:hover{background:var(--bg)}
         <div class="srch"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="ss" placeholder="Search product, customer, cashier…" oninput="renderSales()"/></div>
         <input type="date" class="fsel" id="sd-from" onchange="renderSales()" title="From date"/>
         <input type="date" class="fsel" id="sd-to" onchange="renderSales()" title="To date"/>
-        <select class="fsel" id="sf-pay" onchange="renderSales()"><option value="">All Payments</option><option value="cash">Cash</option><option value="transfer">Transfer</option><option value="card">Card</option><option value="credit">Credit</option></select>
+        <select class="fsel" id="sf-pay" onchange="renderSales()"><option value="">All Payments</option><option value="cash">💵 Cash</option><option value="transfer">🏦 Transfer</option><option value="pos">💳 POS/ATM</option><option value="credit">📋 Credit</option></select>
         <select class="fsel" id="sf-status" onchange="renderSales()"><option value="">All</option><option value="completed">Completed</option><option value="voided">Voided</option></select>
       </div>
-      <div class="card"><div class="tw"><table><thead><tr><th>#</th><th>Product(s)</th><th>Qty</th><th>Total</th><th>Payment</th><th>Customer</th><th>Cashier</th><th>Date</th><th>Actions</th></tr></thead><tbody id="sales-tb"></tbody></table></div></div>
+      <!-- Sales daily summary bar -->
+      <div id="sales-day-summary" style="display:none;background:linear-gradient(135deg,#0F1F45,#1E3A8A);border-radius:10px;padding:12px 16px;margin-bottom:12px;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div style="font-size:.85rem;font-weight:700" id="sds-label">Today</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div style="text-align:center"><div style="font-size:.68rem;opacity:.7">SALES</div><div style="font-size:1.1rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="sds-count">0</div></div>
+          <div style="text-align:center"><div style="font-size:.68rem;opacity:.7">REVENUE</div><div style="font-size:1.1rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#10B981" id="sds-rev">₦0</div></div>
+        </div>
+      </div>
+      <div id="sales-grouped"></div>
     </div>
 
     <!-- REPORTS -->
     <div class="pg" id="pg-reports">
       <div class="pg-head"><div><h2>Reports</h2></div><button class="btn btn-o btn-sm" onclick="exportSalesCSV()">📤 Export</button></div>
-      <div class="report-tabs">
-        <div class="rtab on" onclick="switchRpt('daily',this)">Today</div>
-        <div class="rtab" onclick="switchRpt('weekly',this)">This Week</div>
-        <div class="rtab" onclick="switchRpt('monthly',this)">This Month</div>
-        <div class="rtab" onclick="switchRpt('all',this)">All Time</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+        <div class="report-tabs" style="margin-bottom:0">
+          <div class="rtab on" onclick="switchRpt('daily',this)">Today</div>
+          <div class="rtab" onclick="switchRpt('weekly',this)">This Week</div>
+          <div class="rtab" onclick="switchRpt('monthly',this)">This Month</div>
+          <div class="rtab" onclick="switchRpt('all',this)">All Time</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="date" class="fsel" id="rpt-custom-date" onchange="switchRpt('custom',null)" style="font-size:.8rem" title="Pick a specific date"/>
+          <button class="btn btn-o btn-sm" onclick="clearRptDate()">✕</button>
+        </div>
       </div>
       <div class="sg" style="grid-template-columns:repeat(4,1fr)">
         <div class="sc"><div><div class="label">Sales</div><div class="value" id="rpt-s">0</div></div></div>
@@ -2026,14 +2040,32 @@ function printRcpt(){ const w=window.open('','_blank','width=380,height=600'); w
 
 // ── REPORTS ────────────────────────────────────────
 function switchRpt(t,btn){ RPT_MODE=t; document.querySelectorAll('.rtab').forEach(x=>x.classList.remove('on')); btn.classList.add('on'); renderRpt(); }
+function clearRptDate(){
+  const el=g('rpt-custom-date'); if(el) el.value='';
+  if(RPT_MODE==='custom') switchRpt('daily', document.querySelector('.rtab'));
+  else renderRpt();
+}
+
 function renderRpt(){
   if(!can('rpt')){toast('⛔ No permission','e');return;}
-  const now=new Date(); let start;
-  if(RPT_MODE==='daily') start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const now=new Date(); let start, end=null;
+  const customDate=g('rpt-custom-date')?.value;
+  if(customDate){
+    RPT_MODE='custom';
+    start=new Date(customDate);start.setHours(0,0,0,0);
+    end=new Date(customDate);end.setHours(23,59,59,999);
+  } else if(RPT_MODE==='daily') start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   else if(RPT_MODE==='weekly'){start=new Date(now);start.setDate(now.getDate()-now.getDay());start.setHours(0,0,0,0);}
   else if(RPT_MODE==='monthly') start=new Date(now.getFullYear(),now.getMonth(),1);
   else start=new Date(0);
-  const list=SALES.filter(s=>new Date(s.timestamp)>=start&&s.status!=='voided'&&!s.voided).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  // Single source of truth — all report sections use THIS list
+  const list=SALES.filter(s=>{
+    const t=new Date(s.timestamp);
+    if(t<start) return false;
+    if(end&&t>end) return false;
+    if(s.status==='voided'||s.voided) return false;
+    return true;
+  }).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   const rev=list.reduce((a,s)=>a+(s.total||0),0), units=list.reduce((a,s)=>a+(s.quantity||0),0);
   g('rpt-s').textContent=list.length; g('rpt-r').textContent=fmt(rev);
   g('rpt-a').textContent=fmt(list.length?rev/list.length:0); g('rpt-u').textContent=units;
@@ -2346,7 +2378,15 @@ async function loadDemo(){
 
 // ── EXPORT ─────────────────────────────────────────
 function exportProdsCSV(){ const rows=[['Name','Category','SKU','Price','Cost','Qty','Supplier']]; PRODS.forEach(p=>rows.push([p.name,p.category,p.sku||'',p.price,p.costPrice||0,p.quantity,p.supplier||''])); dlCSV(rows,'products.csv'); toast('Exported!','s'); }
-function exportSalesCSV(){ const rows=[['Product','Qty','Unit Price','Total','Cashier','Customer','Date']]; SALES.forEach(s=>rows.push([s.productName,s.quantity,s.unitPrice,s.total,s.cashier||'',s.customer||'',fmtDT(s.timestamp)])); dlCSV(rows,'sales.csv'); toast('Exported!','s'); }
+function exportSalesCSV(){
+  // Export uses same filter as current sales view
+  const list=typeof getFilteredSales==='function'?getFilteredSales():SALES;
+  const rows=[['Product(s)','Qty','Total','Payment','Customer','Cashier','Date','Status']];
+  const rows2=buildSaleRows(list);
+  rows2.forEach(r=>rows.push([r.products,r.qty,r.total,r.payment,r.customer||'',r.cashier,r.date,r.voided?'Voided':'Completed']));
+  dlCSV(rows,'fujup-sales-'+new Date().toLocaleDateString('en-CA')+'.csv');
+  toast('Exported '+rows2.length+' transactions!','s');
+}
 function dlCSV(rows,fn){ const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n'); const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download=fn; a.click(); }
 
 // ── RESPONSIVE ─────────────────────────────────────
@@ -2968,71 +3008,124 @@ async function saveSale(){
 }
 
 // ── UPGRADED renderSales ──────────────────────────
-function renderSales(){
+function getFilteredSales(){
   const q=(g('ss')?.value||'').toLowerCase();
-  const fromD=g('sd-from')?.value||''; const toD=g('sd-to')?.value||'';
-  const fPay=g('sf-pay')?.value||''; const fStatus=g('sf-status')?.value||'';
-
-  const list=SALES.filter(s=>{
+  const fromD=g('sd-from')?.value||'';
+  const toD=g('sd-to')?.value||'';
+  const fPay=g('sf-pay')?.value||'';
+  const fStatus=g('sf-status')?.value||'';
+  return SALES.filter(s=>{
     if(q&&!s.productName?.toLowerCase().includes(q)&&!(s.customer||'').toLowerCase().includes(q)&&!(s.cashier||'').toLowerCase().includes(q)) return false;
     const sd=fmtD(s.saleDate||s.timestamp);
     if(fromD&&sd<fromD) return false;
     if(toD&&sd>toD) return false;
-    if(fPay&&s.paymentType!==fPay) return false;
+    if(fPay){
+      const pt=(s.paymentType||'cash').toLowerCase();
+      const mapped=pt==='pos'||pt==='atm'?'pos':pt==='transfer'?'transfer':pt==='credit'?'credit':'cash';
+      if(mapped!==fPay) return false;
+    }
     if(fStatus&&(s.status||'completed')!==fStatus) return false;
     return true;
   }).sort((a,b)=>new Date(b.saleDate||b.timestamp)-new Date(a.saleDate||a.timestamp));
+}
 
-  g('sales-sub').textContent=list.length+' transactions';
-  const tb=g('sales-tb');
-  if(!list.length){
-    tb.innerHTML='<tr><td colspan="9"><div class="empty"><div class="empty-icon">💳</div><div class="empty-sub">No transactions found</div></div></td></tr>';
+function buildSaleRows(list){
+  const groups={}, singles=[], seen=new Set();
+  list.forEach(s=>{
+    if(s.receiptId){
+      if(!seen.has(s.receiptId)){
+        seen.add(s.receiptId);
+        const siblings=list.filter(x=>x.receiptId===s.receiptId);
+        const first=siblings[0];
+        const voided=first.status==='voided';
+        const grandTotal=first.grandTotal||siblings.reduce((a,x)=>a+(x.total||0),0);
+        groups[s.receiptId]={
+          key:first.receiptId, products:siblings.map(x=>x.productName).join(', '),
+          qty:siblings.reduce((a,x)=>a+x.quantity,0), total:grandTotal,
+          payment:first.paymentType||'cash', customer:first.customer||'',
+          cashier:first.cashier||'—', rawDate:new Date(first.saleDate||first.timestamp),
+          date:fmtDT(first.saleDate||first.timestamp), voided, id:first.id,
+          rcpId:first.receiptId, isGroup:true
+        };
+      }
+    } else {
+      singles.push({
+        key:s.id, products:s.productName, qty:s.quantity, total:s.grandTotal||s.total,
+        payment:s.paymentType||'cash', customer:s.customer||'',
+        cashier:s.cashier||'—', rawDate:new Date(s.saleDate||s.timestamp),
+        date:fmtDT(s.saleDate||s.timestamp), voided:s.status==='voided',
+        id:s.id, rcpId:s.receiptId||null, isGroup:false
+      });
+    }
+  });
+  return [...Object.values(groups),...singles].sort((a,b)=>b.rawDate-a.rawDate);
+}
+
+function renderSales(){
+  const list=getFilteredSales();
+  const nonVoided=list.filter(s=>s.status!=='voided'&&!s.voided);
+  const totalRev=nonVoided.reduce((a,s)=>a+(s.grandTotal||s.total||0),0);
+
+  // Summary bar
+  const fromD=g('sd-from')?.value||'', toD=g('sd-to')?.value||'';
+  const sds=g('sales-day-summary');
+  if(sds){
+    sds.style.display='flex';
+    const lbl=fromD&&fromD===toD?new Date(fromD).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}):fromD&&toD?fromD+' → '+toD:fromD?'From '+fromD:'All Sales';
+    if(g('sds-label')) g('sds-label').textContent=lbl;
+    if(g('sds-count')) g('sds-count').textContent=nonVoided.length;
+    if(g('sds-rev'))   g('sds-rev').textContent=fmt(totalRev);
+  }
+
+  const rows=buildSaleRows(list);
+  g('sales-sub').textContent=rows.length+' transaction'+(rows.length!==1?'s':'')+' · '+fmt(totalRev);
+
+  // Group by date
+  const byDate={};
+  rows.forEach(r=>{
+    const dk=r.rawDate.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    (byDate[dk]=byDate[dk]||[]).push(r);
+  });
+
+  const cont=g('sales-grouped');
+  if(!rows.length){
+    cont.innerHTML='<div class="empty"><div class="empty-icon">💳</div><div class="empty-sub">No transactions found</div></div>';
     return;
   }
-  // Group by receiptId to collapse multi-item sales
-  const groups={}, singles=[];
-  list.forEach(s=>{
-    if(s.receiptId){ (groups[s.receiptId]=groups[s.receiptId]||[]).push(s); }
-    else singles.push(s);
-  });
-  const rows=[];
-  // Multi-item groups
-  Object.values(groups).forEach(items=>{
-    const first=items[0], total=items.reduce((a,s)=>a+(s.grandTotal||s.total||0),0)/items.length;
-    const voided=first.status==='voided';
-    rows.push({
-      key:first.receiptId, products:items.map(s=>s.productName).join(', '),
-      qty:items.map(s=>s.quantity).join('+'), total:first.grandTotal||total,
-      payment:first.paymentType||'cash', customer:first.customer||'', cashier:first.cashier||'—',
-      date:fmtDT(first.saleDate||first.timestamp), voided, id:first.id,
-      rcpId:first.receiptId, isGroup:true, items
-    });
-  });
-  // Singles
-  singles.forEach(s=>{
-    const voided=s.status==='voided';
-    rows.push({
-      key:s.id, products:s.productName, qty:s.quantity, total:s.grandTotal||s.total,
-      payment:s.paymentType||'cash', customer:s.customer||'', cashier:s.cashier||'—',
-      date:fmtDT(s.saleDate||s.timestamp), voided, id:s.id, rcpId:s.receiptId||null, isGroup:false
-    });
-  });
-  rows.sort((a,b)=>new Date(b.date)-new Date(a.date));
 
-  tb.innerHTML=rows.map((r,i)=>`<tr style="${r.voided?'opacity:.5;text-decoration:line-through;':''}">
-    <td style="color:var(--t4);font-size:.77rem">${rows.length-i}</td>
-    <td class="td-n" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.products)}">${esc(r.products)}</td>
-    <td class="td-m">${r.qty}</td>
-    <td class="td-m td-gr">${fmt(r.total)}</td>
-    <td><span class="bdg ${r.payment==='cash'?'bdg-g':r.payment==='transfer'?'bdg-b':r.payment==='credit'?'bdg-a':'bdg-p'}">${r.payment}</span></td>
-    <td style="font-size:.8rem">${esc(r.customer)||'—'}</td>
-    <td style="font-size:.8rem">${esc(r.cashier)}</td>
-    <td style="color:var(--t4);font-size:.77rem">${r.date}</td>
-    <td style="display:flex;gap:4px;flex-wrap:wrap">
-      ${!r.voided?`<button class="sale-action-btn" onclick="showRcpt('${r.id}')">🧾</button>`:'<span class="bdg bdg-r">Voided</span>'}
-      ${!r.voided&&can('prod')?`<button class="sale-action-btn danger" onclick="openVoidModal('${r.id}')">↩️</button>`:''}
-    </td>
-  </tr>`).join('');
+  const payBadge=p=>{const m=(p||'cash').toLowerCase();return m==='transfer'?'bdg-b':m==='pos'||m==='atm'?'bdg-p':m==='credit'?'bdg-a':'bdg-g';};
+
+  cont.innerHTML=Object.entries(byDate).map(([date,dayRows])=>{
+    const dayTotal=dayRows.filter(r=>!r.voided).reduce((a,r)=>a+(r.total||0),0);
+    const daySales=dayRows.filter(r=>!r.voided).length;
+    return `
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:linear-gradient(135deg,#0F1F45,#1E3A8A);border-radius:10px 10px 0 0;color:#fff">
+        <div style="font-size:.83rem;font-weight:700">📅 ${date}</div>
+        <div style="display:flex;gap:16px;font-size:.78rem">
+          <span>${daySales} sale${daySales!==1?'s':''}</span>
+          <span style="color:#10B981;font-weight:800;font-family:'JetBrains Mono',monospace">${fmt(dayTotal)}</span>
+        </div>
+      </div>
+      <div class="card" style="border-radius:0 0 10px 10px;margin-top:0">
+        <div class="tw"><table><thead><tr><th>#</th><th>Product(s)</th><th>Qty</th><th>Total</th><th>Payment</th><th>Customer</th><th>Cashier</th><th>Time</th><th>Actions</th></tr></thead>
+        <tbody>${dayRows.map((r,i)=>`<tr style="${r.voided?'opacity:.45;text-decoration:line-through;':''}">
+          <td style="color:var(--t4);font-size:.76rem">${i+1}</td>
+          <td class="td-n" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.products)}">${esc(r.products)}</td>
+          <td class="td-m">${r.qty}</td>
+          <td class="td-m td-gr">${fmt(r.total)}</td>
+          <td><span class="bdg ${payBadge(r.payment)}">${r.payment}</span></td>
+          <td style="font-size:.79rem">${esc(r.customer)||'—'}</td>
+          <td style="font-size:.79rem">${esc(r.cashier)}</td>
+          <td style="color:var(--t4);font-size:.75rem">${r.rawDate.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</td>
+          <td style="display:flex;gap:4px">
+            ${!r.voided?`<button class="sale-action-btn" onclick="showRcpt('${r.id}')">🧾</button>`:'<span class="bdg bdg-r" style="font-size:.66rem">Voided</span>'}
+            ${!r.voided&&can('prod')?`<button class="sale-action-btn danger" onclick="openVoidModal('${r.id}')">↩️</button>`:''}
+          </td>
+        </tr>`).join('')}</tbody></table>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── VOID / CORRECT SALE ───────────────────────────
