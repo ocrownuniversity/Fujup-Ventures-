@@ -1512,7 +1512,19 @@ function renderDash(){
   if(SA_MODE && !BID){ renderSADash(); return; }
   const today=new Date().toDateString();
   const tS=SALES.filter(s=>new Date(s.timestamp).toDateString()===today&&s.status!=='voided'&&!s.voided);
-  const tR=tS.reduce((a,s)=>a+(s.total||0),0);
+  // Deduplicate by receiptId so multi-item sales aren't double counted
+  const seenT=new Set(); let tR=0;
+  for(const s of tS){
+    if(s.receiptId){
+      if(seenT.has(s.receiptId)) continue;
+      seenT.add(s.receiptId);
+      tR+=s.grandTotal||s.total||0;
+    } else {
+      tR+=s.grandTotal||s.total||0;
+    }
+  }
+  tR=Math.round(tR*100)/100;
+  const tSUnique=[...new Set(tS.map(s=>s.receiptId||s.id))];
   const lw=PRODS.filter(p=>p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold));
   const ot=PRODS.filter(p=>p.quantity===0);
   // Calculate profit for all periods
@@ -1542,7 +1554,7 @@ function renderDash(){
 
   g('st-p').textContent=PRODS.length;
   g('st-p-s').textContent=ot.length+' out of stock';
-  g('st-s').textContent=tS.length;
+  g('st-s').textContent=tSUnique.length;
   g('st-s-s').textContent=fmt(tR)+' revenue';
   g('st-r').textContent=fmt(tR);
   g('st-l').textContent=lw.length+ot.length;
@@ -2066,25 +2078,39 @@ function renderRpt(){
     if(s.status==='voided'||s.voided) return false;
     return true;
   }).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
-  const rev=list.reduce((a,s)=>a+(s.total||0),0), units=list.reduce((a,s)=>a+(s.quantity||0),0);
-  g('rpt-s').textContent=list.length; g('rpt-r').textContent=fmt(rev);
-  g('rpt-a').textContent=fmt(list.length?rev/list.length:0); g('rpt-u').textContent=units;
+  const units=list.reduce((a,s)=>a+(s.quantity||0),0);
+  const seenR=new Set(); let rev=0,salesCount=0;
+  for(const s of list){
+    if(s.receiptId){ if(seenR.has(s.receiptId)) continue; seenR.add(s.receiptId); }
+    rev+=s.grandTotal||s.total||0; salesCount++;
+  }
+  rev=Math.round(rev*100)/100;
+  g('rpt-s').textContent=salesCount; g('rpt-r').textContent=fmt(rev);
+  g('rpt-a').textContent=fmt(salesCount?rev/salesCount:0); g('rpt-u').textContent=units;
 
-  // Payment method breakdown
+  // Payment breakdown — group by receiptId to avoid double-counting multi-item sales
   const payTotals={cash:0,transfer:0,pos:0,credit:0};
   const payCounts={cash:0,transfer:0,pos:0,credit:0};
+  const seenReceipts=new Set();
   for(const s of list){
+    // Skip duplicate receipt rows — only count each sale once
+    if(s.receiptId){
+      if(seenReceipts.has(s.receiptId)) continue;
+      seenReceipts.add(s.receiptId);
+    }
+    // Use grandTotal for grouped sales, total for singles
+    const amount=s.grandTotal||s.total||0;
     if(s.splitPayments&&s.splitPayments.length>0){
       for(const sp of s.splitPayments){
         const t=(sp.type||'cash').toLowerCase();
         const k=t==='pos'||t==='atm'?'pos':t==='transfer'?'transfer':t==='credit'?'credit':'cash';
-        payTotals[k]=(payTotals[k]||0)+sp.amount;
+        payTotals[k]=Math.round((payTotals[k]||0+sp.amount)*100)/100;
         payCounts[k]=(payCounts[k]||0)+1;
       }
     }else{
       const t=(s.paymentType||'cash').toLowerCase();
       const k=t==='pos'||t==='atm'?'pos':t==='transfer'?'transfer':t==='credit'?'credit':'cash';
-      payTotals[k]=(payTotals[k]||0)+(s.total||0);
+      payTotals[k]=Math.round(((payTotals[k]||0)+amount)*100)/100;
       payCounts[k]=(payCounts[k]||0)+1;
     }
   }
