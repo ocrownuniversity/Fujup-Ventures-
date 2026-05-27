@@ -1498,7 +1498,7 @@ async function loadBranchData(forceRefresh){
         const age=(Date.now()-(data.savedAt||0))/1000/60;
         const prods=data.prods||[];
         // Only use cache if it has data AND is less than 2 hours old
-        if(age<120 && prods.length>0){
+        if(age<480 && prods.length>0){  // 8 hours cache — reduces daily Firebase reads significantly
           PRODS=prods;
           SALES=data.sales||[];
           STAFF=data.staff||[];
@@ -1522,7 +1522,9 @@ async function loadBranchData(forceRefresh){
   }catch(e){console.warn('products:',e.message);}
 
   try{
-    const s=await base.collection('sales').get();
+    // Only fetch sales from last 90 days — avoids reading entire history on every cache miss
+    const ninetyDaysAgo=new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
+    const s=await base.collection('sales').where('saleDate','>=',ninetyDaysAgo.toISOString().split('T')[0]).get();
     SALES=s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
     SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   }catch(e){console.warn('sales:',e.message);}
@@ -3801,18 +3803,31 @@ let EXPENSES = [];
 
 async function loadExpenses(forceRefresh){
   const bid=BID||ME?.buyerId; if(!bid) return;
-  // Always read from Firebase — expenses are small collection, minimal reads
+  // Check cache first — only read Firebase if forced or cache is stale (>60min)
+  if(!forceRefresh){
+    try{
+      const c=localStorage.getItem('fv_cache_'+bid+'_expenses');
+      if(c){
+        const parsed=JSON.parse(c);
+        const age=(Date.now()-(parsed.savedAt||0))/1000/60;
+        if(age<60&&parsed.data){
+          EXPENSES=parsed.data;
+          renderExpenses(); updateExpSummary();
+          return;
+        }
+      }
+    }catch(e){}
+  }
   try{
     const snap=await db.collection('buyers').doc(bid).collection('expenses').get();
     EXPENSES=snap.docs.map(d=>({id:d.id,...d.data(),date:d.data().date||new Date().toISOString()}));
     EXPENSES.sort((a,b)=>new Date(b.date)-new Date(a.date));
-    try{localStorage.setItem('fv_cache_'+bid+'_expenses',JSON.stringify(EXPENSES));}catch(e){}
+    try{localStorage.setItem('fv_cache_'+bid+'_expenses',JSON.stringify({data:EXPENSES,savedAt:Date.now()}));}catch(e){}
     renderExpenses(); updateExpSummary();
   }catch(e){
-    // Firebase failed — try cache as fallback
     try{
       const c=localStorage.getItem('fv_cache_'+bid+'_expenses');
-      if(c){EXPENSES=JSON.parse(c);renderExpenses();updateExpSummary();}
+      if(c){const p=JSON.parse(c);EXPENSES=p.data||p;renderExpenses();updateExpSummary();}
     }catch(e2){}
     console.warn('expenses:',e.message);
   }
@@ -3882,7 +3897,7 @@ async function saveExpense(){
   try{
     const ref=await db.collection('buyers').doc(bid).collection('expenses').add({...data,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     EXPENSES.unshift({id:ref.id,...data});
-    try{const cKey='fv_cache_'+bid+'_expenses';localStorage.setItem(cKey,JSON.stringify(EXPENSES));}catch(e){}
+    try{localStorage.setItem('fv_cache_'+bid+'_expenses',JSON.stringify({data:EXPENSES,savedAt:Date.now()}));}catch(e){}
     closeM('exp-modal');
     toast('✅ Expense of '+fmt(amount)+' recorded!','s');
     renderExpenses(); updateExpSummary();
@@ -3897,7 +3912,7 @@ async function deleteExpense(id){
   try{
     await db.collection('buyers').doc(bid).collection('expenses').doc(id).delete();
     EXPENSES=EXPENSES.filter(e=>e.id!==id);
-    try{const cKey='fv_cache_'+bid+'_expenses';localStorage.setItem(cKey,JSON.stringify(EXPENSES));}catch(e){}
+    try{localStorage.setItem('fv_cache_'+bid+'_expenses',JSON.stringify({data:EXPENSES,savedAt:Date.now()}));}catch(e){}
     renderExpenses(); updateExpSummary();
     toast('Expense deleted','s');
     if(g('pg-dashboard')?.classList.contains('on')) renderDash();
@@ -3907,14 +3922,36 @@ async function deleteExpense(id){
 // ── CREDIT PAYMENTS ──────────────────────────────
 let CREDIT_PAYMENTS = [];
 
-async function loadCreditPayments(){
+async function loadCreditPayments(forceRefresh){
   const bid=BID||ME?.buyerId; if(!bid) return;
+  // Cache check first — credit payments don't change often
+  if(!forceRefresh){
+    try{
+      const c=localStorage.getItem('fv_cache_'+bid+'_credits');
+      if(c){
+        const parsed=JSON.parse(c);
+        const age=(Date.now()-(parsed.savedAt||0))/1000/60;
+        if(age<60&&parsed.data){
+          CREDIT_PAYMENTS=parsed.data;
+          renderCreditPayments(); renderCreditSummary();
+          return;
+        }
+      }
+    }catch(e){}
+  }
   try{
     const snap=await db.collection('buyers').doc(bid).collection('credit_payments').get();
     CREDIT_PAYMENTS=snap.docs.map(d=>({id:d.id,...d.data()}));
     CREDIT_PAYMENTS.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+    try{localStorage.setItem('fv_cache_'+bid+'_credits',JSON.stringify({data:CREDIT_PAYMENTS,savedAt:Date.now()}));}catch(e){}
     renderCreditPayments(); renderCreditSummary();
-  }catch(e){console.warn('credits:',e.message);}
+  }catch(e){
+    try{
+      const c=localStorage.getItem('fv_cache_'+bid+'_credits');
+      if(c){const p=JSON.parse(c);CREDIT_PAYMENTS=p.data||p;renderCreditPayments();renderCreditSummary();}
+    }catch(e2){}
+    console.warn('credits:',e.message);
+  }
 }
 
 function renderCreditSummary(){
