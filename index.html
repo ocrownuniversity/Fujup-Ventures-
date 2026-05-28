@@ -1522,9 +1522,7 @@ async function loadBranchData(forceRefresh){
   }catch(e){console.warn('products:',e.message);}
 
   try{
-    // Only fetch sales from last 90 days — avoids reading entire history on every cache miss
-    const ninetyDaysAgo=new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
-    const s=await base.collection('sales').where('saleDate','>=',ninetyDaysAgo.toISOString().split('T')[0]).get();
+    const s=await base.collection('sales').get();
     SALES=s.docs.map(d=>{const dt=d.data();return{id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()|| new Date(dt.timestamp||Date.now())};});
     SALES.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   }catch(e){console.warn('sales:',e.message);}
@@ -2096,12 +2094,14 @@ async function saveSale(){
 // Show receipt for a single sale (from sales history)
 function showRcpt(sid){
   const s = SALES.find(x=>x.id===sid); if(!s) return;
-  // Check if this sale has siblings (same receiptId = multi-item cart)
   if(s.receiptId){
     const siblings = SALES.filter(x=>x.receiptId===s.receiptId);
-    const items    = siblings.map(x=>({name:x.productName,qty:x.quantity,unitPrice:x.unitPrice,subtotal:x.total}));
-    const total    = siblings.reduce((a,x)=>a+x.total,0);
-    showCartReceipt(items, s.customer, total, s.receiptId, s.cashier, s.timestamp);
+    const first    = siblings[0];
+    const items    = siblings.map(x=>({name:x.productName,qty:x.quantity,unitPrice:x.unitPrice,subtotal:x.total,discPct:x.discPct||0}));
+    const grandTotal = first.grandTotal||siblings.reduce((a,x)=>a+(x.total||0),0);
+    const billDisc = first.billDiscount||0;
+    // Pass splitPayments so receipt shows correct payment breakdown
+    showCartReceipt(items, s.customer, grandTotal, s.receiptId, s.cashier, s.saleDate||s.timestamp, first.splitPayments||[], billDisc);
   } else {
     showRcptData(s);
   }
@@ -2110,7 +2110,12 @@ function showRcpt(sid){
 // Legacy single-item receipt
 function showRcptData(s){
   const bars=Array.from({length:28},(_,i)=>`<div style="width:${i%3===0?3:2}px;height:${28+Math.sin(i)*8}px;background:#111;display:inline-block;margin:0 0.5px"></div>`).join('');
-  g('rcpt-body').innerHTML=`<div class="rcpt"><div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div><div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${String(s.id||'').slice(-6).toUpperCase()}</div><hr class="rcpt-div"/><div class="rcpt-row"><span>${esc(s.productName)}</span></div><div class="rcpt-row"><span style="color:#6B7280">  ${s.quantity} × ${fmt(s.unitPrice)}</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row rcpt-tot"><span>TOTAL</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row"><span style="color:#6B7280">Cashier</span><span>${esc(s.cashier||'—')}</span></div><div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${fmtDT(s.timestamp)}</span></div>${s.customer?`<div class="rcpt-row"><span style="color:#6B7280">Customer</span><span>${esc(s.customer)}</span></div>`:''}<hr class="rcpt-div"/><div style="text-align:center;margin:4px 0">${bars}</div><div class="rcpt-foot">Thank you! · Fujup Venture</div></div>`;
+  // Build payment section for single-item receipt
+  const _sp=s.splitPayments&&s.splitPayments.length>0?s.splitPayments:[];
+  const _payRows=_sp.length>1
+    ?`<div class="rcpt-row"><span style="color:#6B7280;font-weight:700">Payment</span><span style="font-weight:700">SPLIT</span></div>`+_sp.map(p=>`<div class="rcpt-row"><span style="color:#6B7280">→ ${(p.type||'cash').toUpperCase()}</span><span>${fmt(p.amount)}</span></div>`).join('')
+    :`<div class="rcpt-row"><span style="color:#6B7280">Payment</span><span>${(_sp[0]?.type||s.paymentType||'cash').toUpperCase()}</span></div>`;
+  g('rcpt-body').innerHTML=`<div class="rcpt"><div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div><div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${String(s.id||'').slice(-6).toUpperCase()}</div><hr class="rcpt-div"/><div class="rcpt-row"><span>${esc(s.productName)}</span></div><div class="rcpt-row"><span style="color:#6B7280">  ${s.quantity} × ${fmt(s.unitPrice)}</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row rcpt-tot"><span>TOTAL</span><span>${fmt(s.grandTotal||s.total)}</span></div><hr class="rcpt-div"/>${_payRows}<div class="rcpt-row"><span style="color:#6B7280">Cashier</span><span>${esc(s.cashier||'—')}</span></div><div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${fmtDT(s.saleDate||s.timestamp)}</span></div>${s.customer?`<div class="rcpt-row"><span style="color:#6B7280">Customer</span><span>${esc(s.customer)}</span></div>`:''}<hr class="rcpt-div"/><div style="text-align:center;margin:4px 0">${bars}</div><div class="rcpt-foot">Thank you! · Fujup Venture</div></div>`;
   openM('rcpt-modal');
 }
 
@@ -3157,14 +3162,28 @@ function getFilteredSales(){
     if(fPay){
       const pt=(s.paymentType||'cash').toLowerCase();
       const mapped=pt==='pos'||pt==='atm'?'pos':pt==='transfer'?'transfer':pt==='credit'?'credit':'cash';
-      if(mapped!==fPay) return false;
+      // Also check splitPayments — a split sale may contain the filtered type
+      const inSplit=s.splitPayments&&s.splitPayments.some(sp=>{
+        const st=(sp.type||'').toLowerCase();
+        const sm=st==='pos'||st==='atm'?'pos':st==='transfer'?'transfer':st==='credit'?'credit':'cash';
+        return sm===fPay;
+      });
+      if(mapped!==fPay&&!inSplit) return false;
     }
     if(fStatus&&(s.status||'completed')!==fStatus) return false;
     return true;
   }).sort((a,b)=>new Date(b.saleDate||b.timestamp)-new Date(a.saleDate||a.timestamp));
 }
 
-function buildSaleRows(list){
+function buildSaleRows(list, activePayFilter){
+  // Helper: map raw payment type to filter key
+  const mapType=t=>{const m=(t||'cash').toLowerCase();return m==='pos'||m==='atm'?'pos':m==='transfer'?'transfer':m==='credit'?'credit':'cash';};
+  // If a payment filter is active, compute only the matching split portion for display
+  const displayTotal=(splitPayments, grandTotal)=>{
+    if(!activePayFilter||!splitPayments||splitPayments.length<=1) return grandTotal;
+    const portion=splitPayments.filter(sp=>mapType(sp.type)===activePayFilter).reduce((a,sp)=>a+(sp.amount||0),0);
+    return portion>0?portion:grandTotal;
+  };
   const groups={}, singles=[], seen=new Set();
   list.forEach(s=>{
     if(s.receiptId){
@@ -3174,19 +3193,28 @@ function buildSaleRows(list){
         const first=siblings[0];
         const voided=first.status==='voided';
         const grandTotal=first.grandTotal||siblings.reduce((a,x)=>a+(x.total||0),0);
+        const splits=first.splitPayments||[];
         groups[s.receiptId]={
           key:first.receiptId, products:siblings.map(x=>x.productName).join(', '),
-          qty:siblings.reduce((a,x)=>a+x.quantity,0), total:grandTotal,
-          payment:first.paymentType||'cash', customer:first.customer||'',
+          qty:siblings.reduce((a,x)=>a+x.quantity,0),
+          total:displayTotal(splits,grandTotal),
+          grandTotal,
+          payment:splits.length>1?'Split: '+splits.map(p=>(p.type||'cash')).join('+'):(first.paymentType||'cash'),
+          splitPayments:splits, customer:first.customer||'',
           cashier:first.cashier||'—', rawDate:new Date(first.saleDate||first.timestamp),
           date:fmtDT(first.saleDate||first.timestamp), voided, id:first.id,
           rcpId:first.receiptId, isGroup:true
         };
       }
     } else {
+      const splits=s.splitPayments||[];
+      const grandTotal=s.grandTotal||s.total;
       singles.push({
-        key:s.id, products:s.productName, qty:s.quantity, total:s.grandTotal||s.total,
-        payment:s.paymentType||'cash', customer:s.customer||'',
+        key:s.id, products:s.productName, qty:s.quantity,
+        total:displayTotal(splits,grandTotal),
+        grandTotal,
+        payment:splits.length>1?'Split: '+splits.map(p=>(p.type||'cash')).join('+'):(s.paymentType||'cash'),
+        splitPayments:splits, customer:s.customer||'',
         cashier:s.cashier||'—', rawDate:new Date(s.saleDate||s.timestamp),
         date:fmtDT(s.saleDate||s.timestamp), voided:s.status==='voided',
         id:s.id, rcpId:s.receiptId||null, isGroup:false
@@ -3197,13 +3225,20 @@ function buildSaleRows(list){
 }
 
 function renderSales(){
+  const fPay=g('sf-pay')?.value||'';
   const list=getFilteredSales();
   const nonVoided=list.filter(s=>s.status!=='voided'&&!s.voided);
-  // Deduplicate by receiptId so multi-item receipts are counted once
+  // Deduplicate by receiptId — when payment filter active, sum only the matching split portion
+  const mapTypeRev=t=>{const m=(t||'cash').toLowerCase();return m==='pos'||m==='atm'?'pos':m==='transfer'?'transfer':m==='credit'?'credit':'cash';};
   const seenRevIds=new Set(); let totalRev=0;
   for(const s of nonVoided){
     if(s.receiptId){ if(seenRevIds.has(s.receiptId)) continue; seenRevIds.add(s.receiptId); }
-    totalRev+=s.grandTotal||s.total||0;
+    const splits=s.splitPayments||[];
+    if(fPay&&splits.length>1){
+      totalRev+=splits.filter(sp=>mapTypeRev(sp.type)===fPay).reduce((a,sp)=>a+(sp.amount||0),0);
+    } else {
+      totalRev+=s.grandTotal||s.total||0;
+    }
   }
   totalRev=Math.round(totalRev*100)/100;
 
@@ -3218,7 +3253,7 @@ function renderSales(){
     if(g('sds-rev'))   g('sds-rev').textContent=fmt(totalRev);
   }
 
-  const rows=buildSaleRows(list);
+  const rows=buildSaleRows(list,fPay);
   g('sales-sub').textContent=rows.length+' transaction'+(rows.length!==1?'s':'')+' · '+fmt(totalRev);
 
   // Group by date
@@ -3234,7 +3269,7 @@ function renderSales(){
     return;
   }
 
-  const payBadge=p=>{const m=(p||'cash').toLowerCase();return m==='transfer'?'bdg-b':m==='pos'||m==='atm'?'bdg-p':m==='credit'?'bdg-a':'bdg-g';};
+  const payBadge=p=>{const m=(p||'cash').toLowerCase();if(m.startsWith('split')) return 'bdg-p';return m==='transfer'?'bdg-b':m==='pos'||m==='atm'?'bdg-p':m==='credit'?'bdg-a':'bdg-g';};
 
   cont.innerHTML=Object.entries(byDate).map(([date,dayRows])=>{
     const dayTotal=dayRows.filter(r=>!r.voided).reduce((a,r)=>a+(r.total||0),0);
@@ -3488,9 +3523,9 @@ openProdModal=function(id){
   openM('prod-modal');
 };
 
-// ── UPGRADED showCartReceipt (add payment + discount) ──
+// ── UPGRADED showCartReceipt (correctly handles splitPayments array) ──
 const _origShowCartRcpt=showCartReceipt;
-showCartReceipt=function(items,customer,grandTotal,receiptId,cashier,timestamp,pType,discAmt){
+showCartReceipt=function(items,customer,grandTotal,receiptId,cashier,timestamp,splitPayments,discAmt){
   const bars=Array.from({length:28},(_,i)=>`<div style="width:${i%3===0?3:2}px;height:${28+Math.sin(i)*8}px;background:#111;display:inline-block;margin:0 0.5px"></div>`).join('');
   const date=fmtDT(timestamp||new Date());
   const rcpNum=String(receiptId||Date.now()).slice(-8).toUpperCase();
@@ -3499,6 +3534,12 @@ showCartReceipt=function(items,customer,grandTotal,receiptId,cashier,timestamp,p
     <div class="rcpt-row"><span style="font-weight:700">${esc(item.name)}</span></div>
     <div class="rcpt-row"><span style="color:#6B7280;padding-left:8px">${item.qty} × ${fmt(item.unitPrice)}${item.discPct>0?` (-${item.discPct}%)`:''}</span><span>${fmt(item.subtotal||item.unitPrice*item.qty)}</span></div>
   `).join('<div style="height:3px"></div>');
+  // Build payment rows — show each method with its amount for split payments
+  const splits=Array.isArray(splitPayments)&&splitPayments.length>0?splitPayments:[];
+  const payRows=splits.length>1
+    ?splits.map(sp=>`<div class="rcpt-row"><span style="color:#6B7280">→ ${(sp.type||'cash').toUpperCase()}</span><span>${fmt(sp.amount)}</span></div>`).join('')
+    :`<div class="rcpt-row"><span style="color:#6B7280">Payment</span><span>${((splits[0]?.type)||'CASH').toUpperCase()}</span></div>`;
+  const payLabel=splits.length>1?'SPLIT ('+splits.map(p=>(p.type||'cash').toUpperCase()).join(' + ')+')':'';
   g('rcpt-body').innerHTML=`
     <div class="rcpt">
       <div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div>
@@ -3510,7 +3551,8 @@ showCartReceipt=function(items,customer,grandTotal,receiptId,cashier,timestamp,p
       ${(discAmt&&discAmt>0)?`<div class="rcpt-row"><span style="color:#6B7280">Subtotal</span><span>${fmt(subtotal)}</span></div><div class="rcpt-row"><span style="color:#DC2626">Discount</span><span style="color:#DC2626">-${fmt(discAmt)}</span></div>`:''}
       <div class="rcpt-row rcpt-tot"><span>TOTAL</span><span>${fmt(grandTotal)}</span></div>
       <hr class="rcpt-div"/>
-      <div class="rcpt-row"><span style="color:#6B7280">Payment</span><span>${(pType||'cash').toUpperCase()}</span></div>
+      ${payLabel?`<div class="rcpt-row"><span style="color:#6B7280;font-weight:700">Payment</span><span style="font-weight:700">${payLabel}</span></div>`:''}
+      ${payRows}
       <div class="rcpt-row"><span style="color:#6B7280">Items</span><span>${items.length} product${items.length>1?'s':''}</span></div>
       <div class="rcpt-row"><span style="color:#6B7280">Cashier</span><span>${esc(cashier||'—')}</span></div>
       ${customer?`<div class="rcpt-row"><span style="color:#6B7280">Customer</span><span>${esc(customer)}</span></div>`:''}
