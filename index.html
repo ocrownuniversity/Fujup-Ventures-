@@ -2097,7 +2097,7 @@ function showRcpt(sid){
   if(s.receiptId){
     const siblings = SALES.filter(x=>x.receiptId===s.receiptId);
     const first    = siblings[0];
-    const items    = siblings.map(x=>({name:x.productName,qty:x.quantity,unitPrice:x.unitPrice,subtotal:x.total,discPct:x.discPct||0}));
+    const items    = siblings.map(x=>({name:x.productName,qty:x.quantity,unitPrice:x.unitPrice,subtotal:Math.round((x.subtotal||x.total||x.unitPrice*x.quantity)*100)/100,discPct:x.discPct||0}));
     const grandTotal = first.grandTotal||siblings.reduce((a,x)=>a+(x.total||0),0);
     const billDisc = first.billDiscount||0;
     // Pass splitPayments so receipt shows correct payment breakdown
@@ -2735,8 +2735,8 @@ function addToCart(){
   const name=(g('sm-prod-search')?.value||'').split(' (')[0].trim()||pid;
   const prod=PRODS.find(p=>p.id===pid);
   const discPct=parseFloat(g('sm-item-disc')?.value)||0;
-  const discAmt=price*qty*(discPct/100);
-  const subtotal=price*qty-discAmt;
+  const discAmt=Math.round(price*qty*(discPct/100)*100)/100;
+  const subtotal=Math.round((price*qty-discAmt)*100)/100;
   const ups=parseInt(sel.dataset.ups||sel.dataset.upp||0);
 
   const existing=CART.find(c=>c.productId===pid);
@@ -3529,10 +3529,10 @@ showCartReceipt=function(items,customer,grandTotal,receiptId,cashier,timestamp,s
   const bars=Array.from({length:28},(_,i)=>`<div style="width:${i%3===0?3:2}px;height:${28+Math.sin(i)*8}px;background:#111;display:inline-block;margin:0 0.5px"></div>`).join('');
   const date=fmtDT(timestamp||new Date());
   const rcpNum=String(receiptId||Date.now()).slice(-8).toUpperCase();
-  const subtotal=items.reduce((a,i)=>a+(i.subtotal||i.unitPrice*i.qty),0);
+  const subtotal=Math.round(items.reduce((a,i)=>a+(i.subtotal!=null?i.subtotal:i.unitPrice*i.qty),0)*100)/100;
   const rows=items.map(item=>`
     <div class="rcpt-row"><span style="font-weight:700">${esc(item.name)}</span></div>
-    <div class="rcpt-row"><span style="color:#6B7280;padding-left:8px">${item.qty} × ${fmt(item.unitPrice)}${item.discPct>0?` (-${item.discPct}%)`:''}</span><span>${fmt(item.subtotal||item.unitPrice*item.qty)}</span></div>
+    <div class="rcpt-row"><span style="color:#6B7280;padding-left:8px">${item.qty} × ${fmt(item.unitPrice)}${item.discPct>0?` (-${item.discPct}%)`:''}</span><span>${fmt(Math.round((item.subtotal!=null?item.subtotal:item.unitPrice*item.qty)*100)/100)}</span></div>
   `).join('<div style="height:3px"></div>');
   // Build payment rows — show each method with its amount for split payments
   const splits=Array.isArray(splitPayments)&&splitPayments.length>0?splitPayments:[];
