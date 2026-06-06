@@ -552,6 +552,19 @@ tbody tr:hover{background:var(--bg)}
         <select class="fsel" id="pc" onchange="renderProds()"><option value="">All Categories</option></select>
         <select class="fsel" id="psort" onchange="renderProds()"><option value="name">A–Z</option><option value="price">Price</option><option value="qty">Quantity</option></select>
       </div>
+      <!-- Negative Stock Alert Banner -->
+      <div id="neg-stock-banner" style="display:none;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:1.3rem">⚠️</span>
+          <div>
+            <div style="font-weight:700;color:#DC2626;font-size:.9rem">Negative Stock Detected</div>
+            <div style="font-size:.75rem;color:#6B7280" id="neg-stock-msg">Some products have negative stock — likely from offline sync double-deduction</div>
+          </div>
+        </div>
+        <div id="neg-stock-list" style="margin-bottom:10px"></div>
+        <button onclick="fixNegativeStock()" style="background:#DC2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:.82rem;cursor:pointer;width:100%">🔧 Fix All — Set Negative Stock to Zero</button>
+      </div>
+
       <!-- Inventory Valuation Summary — Super Admin only -->
       <div id="inv-val-panel" style="display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
         <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:13px">
@@ -1733,7 +1746,7 @@ function renderProds(){
   const con=g('prod-grid');
   con.innerHTML=list.length?list.map(p=>{
     const lw=p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold);
-    const ot=p.quantity===0;
+    const ot=p.quantity<=0;
     const em=EMOJI[p.category]||'📦';
     return `<div class="pc ${ot?'out':lw?'low':''}">
       <div class="pc-img">${em}${ot?'<span class="pc-bdg bdg bdg-r">Out</span>':lw?'<span class="pc-bdg bdg bdg-a">Low</span>':''}
@@ -1742,7 +1755,7 @@ function renderProds(){
         <div class="pc-cat">${esc(p.category)}</div>
         <div class="pc-name">${esc(p.name)}</div>
         <div class="pc-sku">${p.sku||'No SKU'}</div>
-        <div class="pc-row"><span class="pc-price">${fmt(p.price)}</span><span class="pc-qty ${ot?'ot':lw?'lw':'ok'}">${ot?'Out':p.quantity+' units'}</span></div>${p.costPrice?`<div style="font-size:.69rem;color:var(--t3);margin-top:3px">Margin: <span style="color:#059669;font-weight:700">${fmt(p.price-p.costPrice)}</span> (${Math.round(((p.price-p.costPrice)/p.price)*100)}%)</div>`:''}
+        <div class="pc-row"><span class="pc-price">${fmt(p.price)}</span><span class="pc-qty ${ot?'ot':lw?'lw':'ok'}">${p.quantity<0?'⚠️ '+p.quantity+' (fix stock)':ot?'Out':p.quantity+' units'}</span></div>${p.costPrice?`<div style="font-size:.69rem;color:var(--t3);margin-top:3px">Margin: <span style="color:#059669;font-weight:700">${fmt(p.price-p.costPrice)}</span> (${Math.round(((p.price-p.costPrice)/p.price)*100)}%)</div>`:''}
         <div class="pc-btns">
           ${can('prod')?`<button class="btn btn-o btn-sm" style="flex:1;font-size:.77rem" onclick="openProdModal('${p.id}')">✏️ Edit</button>`:''}
           ${can('prod')?`<button class="btn btn-o btn-sm" style="font-size:.77rem;color:#2563EB" onclick="openStockModal('${p.id}')">📦</button>`:''}
@@ -1891,6 +1904,25 @@ async function confirmDel(){
 }
 
 // ── STOCK ADJUST ───────────────────────────────────
+async function fixNegativeStock(){
+  const bid=BID||ME?.buyerId; if(!bid) return;
+  const negProds=PRODS.filter(p=>p.quantity<0);
+  if(!negProds.length){ toast('No negative stock to fix','i'); return; }
+  if(!confirm('Set stock to 0 for '+negProds.length+' product(s)? You can then enter the correct stock count manually.')) return;
+  let fixed=0;
+  for(const p of negProds){
+    try{
+      await db.collection('buyers').doc(bid).collection('products').doc(p.id).update({quantity:0});
+      p.quantity=0;
+      fixed++;
+    }catch(e){ console.warn('Could not fix',p.name,e.message); }
+  }
+  // Update cache
+  try{const cKey='fv_cache_'+bid;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}}catch(e){}
+  toast('✅ Fixed '+fixed+' product'+(fixed!==1?'s':'')+' — now set to 0. Please enter correct stock counts.','s');
+  renderProds();
+}
+
 function openStockModal(pid){ if(!can('prod')){toast('⛔ No permission','e');return;} const p=PRODS.find(x=>x.id===pid); if(!p)return; g('sa-info').textContent=p.name+' — current: '+p.quantity+' units'; g('sa-pid').value=pid; g('sa-qty').value=''; g('sa-reason').value=''; g('sa-type').value='add'; openM('stock-modal'); }
 async function saveStockAdj(){
   const pid=g('sa-pid').value, type=g('sa-type').value, qty=parseInt(g('sa-qty').value), reason=g('sa-reason').value.trim();
@@ -1899,7 +1931,7 @@ async function saveStockAdj(){
   const p=PRODS.find(x=>x.id===pid); if(!p)return;
   let newQty=p.quantity;
   if(type==='add') newQty+=qty;
-  else if(type==='remove'){if(qty>p.quantity){toast('Cannot remove more than stock','e');return;} newQty-=qty;}
+  else if(type==='remove'){ newQty-=qty; } // allow negative for corrections
   else newQty=qty;
   try{ await db.collection('buyers').doc(adjBID).collection('products').doc(pid).update({quantity:newQty}); addNotif('info','Stock Adjusted',p.name+': '+p.quantity+' → '+newQty+' units. '+(reason||'')); closeM('stock-modal'); toast('Stock updated → '+newQty+' units','s'); }
   catch(e){ toast('Failed: '+e.message,'e'); }
@@ -1934,7 +1966,7 @@ function openSaleModal(){
   // Populate product dropdown
   const sel = g('sm-prod');
   sel.innerHTML = '<option value="">— Select product —</option>' +
-    PRODS.filter(p=>p.quantity>0).map(p=>
+    PRODS.filter(p=>p.quantity>-50).map(p=>  // allow negative stock products to still appear in search
       `<option value="${p.id}" data-p="${p.price}" data-q="${p.quantity}">${esc(p.name)} (${p.quantity} in stock)</option>`
     ).join('');
   openM('sale-modal');
@@ -1968,7 +2000,7 @@ function addToCart(){
   const alreadyInCart = CART.find(c=>c.productId===pid);
   const alreadyQty    = alreadyInCart ? alreadyInCart.qty : 0;
   if(alreadyQty + qty > stock){
-    toast('Only '+(stock-alreadyQty)+' more units available','e'); return;
+    toast('⚠️ Only '+(stock-alreadyQty)+' units left — proceeding anyway','w');
   }
 
   if(alreadyInCart){
@@ -2034,7 +2066,7 @@ function changeCartQty(index, delta){
   const stock = prod?.quantity||0;
   const newQty= item.qty + delta;
   if(newQty < 1){ removeFromCart(index); return; }
-  if(newQty > stock){ toast('Only '+stock+' units in stock','e'); return; }
+  if(newQty > stock){ toast('⚠️ Only '+stock+' units in stock — proceeding anyway','w'); }
   item.qty     = newQty;
   item.subtotal= newQty * item.unitPrice;
   renderCart();
@@ -2069,7 +2101,7 @@ async function saveSale(){
     for(const item of CART){
       const prod = PRODS.find(p=>p.id===item.productId);
       if(!prod){ ferr('sm-err','Product "'+item.name+'" not found.'); return; }
-      if(item.qty > prod.quantity){ ferr('sm-err','Not enough stock for "'+item.name+'". Only '+prod.quantity+' available.'); return; }
+      if(item.qty > prod.quantity){ console.warn('Low stock for '+item.name+': selling '+item.qty+', have '+prod.quantity); } // warn only — allow sale to proceed
 
       // Each cart item becomes one sale record
       const saleRef = db.collection('buyers').doc(activeBID).collection('sales').doc();
@@ -2835,7 +2867,7 @@ function changeCartQty(index,delta){
   const step=item.unitsPerPack>1?0.5:1;
   const newQty=Math.round((item.qty+delta)*1000)/1000;
   if(newQty<=0){ removeFromCart(index); return; }
-  if(newQty>stock){ toast('Only '+stock+' units in stock','e'); return; }
+  if(newQty>stock){ toast('⚠️ Only '+stock+' units in stock — proceeding anyway','w'); }
   item.qty=newQty;
   item.subtotal=Math.round(item.qty*item.unitPrice*(1-item.discPct/100)*100)/100;
   renderCart();
@@ -2862,12 +2894,15 @@ function filterProdDropdown(){
   } else {
     dd.innerHTML=matches.map(p=>{
       const qty=p.quantity||0;
-      const outStr=qty<=0?' <span style="color:#EF4444;font-size:.7rem">(Out of stock)</span>':'';
+      const negStock=qty<0;
+      const outStr=negStock
+        ?` <span style="color:#EF4444;font-size:.7rem">(⚠️ ${qty} — fix stock)</span>`
+        :qty===0?' <span style="color:#EF4444;font-size:.7rem">(Out of stock)</span>':'';
       return `<div onclick="selectProd('${p.id}')"
-        style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bord);font-size:.85rem;display:flex;justify-content:space-between;align-items:center;${qty<=0?'opacity:.5':''}">
+        style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bord);font-size:.85rem;display:flex;justify-content:space-between;align-items:center;${qty===0?'opacity:.6':''}">
         <div>
           <div style="font-weight:700;color:var(--navy)">${esc(p.name||'')}${outStr}</div>
-          <div style="font-size:.75rem;color:var(--t3)">${qty} ${p.unitType||'units'} in stock</div>
+          <div style="font-size:.75rem;color:${negStock?'#EF4444':'var(--t3)'};">${negStock?'⚠️ Negative stock — please correct via Stock Adjust':qty+' '+( p.unitType||'units')+' in stock'}</div>
         </div>
         <div style="font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace;font-size:.85rem">${fmt(p.price||0)}</div>
       </div>`;
@@ -3158,7 +3193,7 @@ async function saveSale(){
         // Reduce product qty locally
         const prod=PRODS.find(p=>p.id===item.productId);
         if(prod) prod.quantity=Math.round((prod.quantity-item.qty)*100)/100;
-        queueOp({type:'updateStock',bid:activeBID,id:item.productId,quantity:prod?.quantity||0});
+        queueOp({type:'deductStock',bid:activeBID,id:item.productId,delta:item.qty}); // use delta not absolute — prevents double-deduction
       }
       // Update cache
       try{const cKey='fv_cache_'+activeBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.sales=SALES;d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}}catch(ex){}
@@ -3448,6 +3483,26 @@ renderProds=function(){
   let list=PRODS.filter(p=>(!q||p.name.toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q))&&(!cat||p.category===cat));
   list.sort((a,b)=>srt==='price'?a.price-b.price:srt==='qty'?a.quantity-b.quantity:a.name.localeCompare(b.name));
   g('prod-sub').textContent=list.length+' of '+PRODS.length+' products';
+  // Negative stock detection — show banner if any products have qty < 0
+  const negProds=PRODS.filter(p=>p.quantity<0);
+  const negBanner=g('neg-stock-banner');
+  if(negBanner){
+    if(negProds.length>0){
+      negBanner.style.display='block';
+      const list=g('neg-stock-list');
+      if(list) list.innerHTML=negProds.map(p=>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #FECACA;font-size:.82rem">
+          <span style="font-weight:600;color:#111">${esc(p.name)}</span>
+          <span style="color:#DC2626;font-weight:700">${p.quantity} units</span>
+        </div>`
+      ).join('');
+      const msg=g('neg-stock-msg');
+      if(msg) msg.textContent=negProds.length+' product'+(negProds.length>1?'s have':' has')+' negative stock — likely from offline sync double-deduction';
+    } else {
+      negBanner.style.display='none';
+    }
+  }
+
   // Stock valuation — visible to Super Admin only
   const valPanel=g('inv-val-panel');
   if(valPanel) valPanel.style.display=(SA_MODE)?'grid':'none';
@@ -3639,9 +3694,21 @@ async function syncOfflineQueue(){
       } else if(op.type==='updateProduct'){
         await db.collection('buyers').doc(op.bid).collection('products').doc(op.id).update(op.data);
       } else if(op.type==='addSale'){
-        await db.collection('buyers').doc(op.bid).collection('sales').doc(op.id).set(op.data);
+        // Check if sale already exists in Firebase before writing — prevents double entry
+        const existing=await db.collection('buyers').doc(op.bid).collection('sales').doc(op.id).get();
+        if(!existing.exists){
+          await db.collection('buyers').doc(op.bid).collection('sales').doc(op.id).set(op.data);
+        } else {
+          console.log('[Sync] Sale already exists, skipping:', op.id);
+        }
       } else if(op.type==='updateStock'){
+        // Legacy absolute — set directly (old queue items)
         await db.collection('buyers').doc(op.bid).collection('products').doc(op.id).update({quantity:op.quantity});
+      } else if(op.type==='deductStock'){
+        // Safe delta deduction — uses Firestore increment so concurrent writes don't overwrite each other
+        await db.collection('buyers').doc(op.bid).collection('products').doc(op.id).update({
+          quantity: firebase.firestore.FieldValue.increment(-op.delta)
+        });
       }
     }catch(e){
       if(e.message?.includes('quota')||e.message?.includes('Quota')||e.message?.includes('resource-exhausted')){
