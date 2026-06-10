@@ -4031,23 +4031,21 @@ if('serviceWorker' in navigator){
   window.addEventListener('load', async ()=>{
     try{
       const reg = await navigator.serviceWorker.register('sw.js');
-      console.log('[PWA] Service worker registered:', reg.scope);
-      // Check for updates every time app loads
-      reg.addEventListener('updatefound', ()=>{
-        const newWorker = reg.installing;
-        newWorker.addEventListener('statechange', ()=>{
-          if(newWorker.state==='installed' && navigator.serviceWorker.controller){
-            // New version available — show update toast
-            if(typeof toast === 'function') toast('🔄 Update available — reload to apply','i');
-          }
-        });
-      });
+      // Poll for updates every 60 seconds — catches new deployments quickly
+      setInterval(()=>{ reg.update(); }, 60000);
     }catch(e){ console.warn('[PWA] SW registration failed:', e); }
   });
-  // Listen for SW telling us we are offline/online
+  // When SW sends NEW_VERSION — auto reload silently, no user action needed
   navigator.serviceWorker.addEventListener('message', e=>{
-    if(e.data?.type==='OFFLINE') if(typeof toast==='function') toast('📴 You are offline — changes saved locally','i');
-    if(e.data?.type==='ONLINE')  if(typeof toast==='function') toast('✅ Back online — syncing...','s');
+    if(e.data?.type==='NEW_VERSION'){
+      // Small delay so the SW finishes activating before we reload
+      setTimeout(()=>{ window.location.reload(); }, 500);
+    }
+  });
+  // Reload when controller changes (new SW took over)
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(!refreshing){ refreshing=true; window.location.reload(); }
   });
 }
 // ── PWA INSTALL PROMPT ──
