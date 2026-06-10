@@ -1040,7 +1040,7 @@ tbody tr:hover{background:var(--bg)}
   <div class="mbd">
     <div id="sa-info" style="font-weight:700;font-size:.9rem;color:var(--navy);margin-bottom:12px"></div>
     <div class="fg2"><label class="fl">Type</label><select class="fc" id="sa-type"><option value="add">➕ Add (Restock)</option><option value="remove">➖ Remove (Damage/Expiry)</option><option value="set">📌 Set Exact Quantity</option></select></div>
-    <div class="fg2"><label class="fl">Quantity</label><input class="fc" type="number" id="sa-qty" min="0"/></div>
+    <div class="fg2"><label class="fl">Quantity</label><input class="fc" type="number" id="sa-qty" min="0" step="0.001"/></div>
     <div class="fg2"><label class="fl">Reason</label><input class="fc" id="sa-reason" placeholder="e.g. Received from supplier"/></div>
     <input type="hidden" id="sa-pid"/>
   </div>
@@ -1885,7 +1885,7 @@ async function saveProd(){
   if(!can('prod')){toast('⛔ No permission','e');return;}
   const effectiveProdBID = BID || ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first','e');return;}
   const name=g('pm-name').value.trim(), cat=g('pm-cat').value.trim();
-  const price=parseFloat(g('pm-price').value), qty=parseInt(g('pm-qty').value);
+  const price=parseFloat(g('pm-price').value), qty=parseFloat(g('pm-qty').value);
   const eid=g('pm-id').value;
   if(!name) return ferr('pm-err','Product name is required.');
   if(!cat)  return ferr('pm-err','Category is required.');
@@ -1954,31 +1954,8 @@ async function saveProd(){
   }catch(e){
     const msg=e.message||'';
     if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')||msg.includes('Failed to get')){
-      // Save to offline queue — will sync when quota resets
-      const localId='local-'+Date.now();
-      if(eid){
-        queueOp({type:'updateProduct',bid:effectiveProdBID,id:eid,data});
-      } else {
-        PRODS.unshift({id:localId,...data,dateAdded:new Date().toISOString(),_offline:true});
-        queueOp({type:'addProduct',bid:effectiveProdBID,data:{...data,dateAdded:new Date().toISOString()}});
-        // Update cache with new product
-        try{const cKey='fv_cache_'+effectiveProdBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));} else {localStorage.setItem('fv_cache_'+effectiveProdBID,JSON.stringify({prods:PRODS,sales:SALES,staff:STAFF,notifs:NOTIFS,savedAt:Date.now()}));}}catch(ex){}
-        btn.textContent='✅ Saved!'; btn.style.background='#F59E0B';
-        const err=g('pm-err');
-        err.style.cssText='background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;border-radius:8px;padding:10px 13px;font-size:.85rem;font-weight:700;margin-bottom:11px;';
-        err.innerHTML='✅ "'+name+'" saved! Will sync to Firebase when quota resets.';
-        err.classList.remove('h');
-        // Refresh ALL pages that show product data
-        renderProds();
-        renderDash();
-        checkLowStock();
-        updateSyncBtn();
-        setTimeout(()=>{
-          closeM('prod-modal');
-          toast('✅ "'+name+'" added! (offline — syncs later)','s');
-        },1500);
-        return;
-      }
+      // Products must be live — no offline saving so all phones see it immediately
+      ferr('pm-err','❌ Firebase quota reached. Products cannot be saved offline. Please try again later or when quota resets.');
       resetBtn(eid?'Save Changes':'Add Product');
     } else {
       ferr('pm-err','Save failed: '+msg);
@@ -2018,7 +1995,7 @@ async function fixNegativeStock(){
 
 function openStockModal(pid){ if(!can('prod')){toast('⛔ No permission','e');return;} const p=PRODS.find(x=>x.id===pid); if(!p)return; g('sa-info').textContent=p.name+' — current: '+p.quantity+' units'; g('sa-pid').value=pid; g('sa-qty').value=''; g('sa-reason').value=''; g('sa-type').value='add'; openM('stock-modal'); }
 async function saveStockAdj(){
-  const pid=g('sa-pid').value, type=g('sa-type').value, qty=parseInt(g('sa-qty').value), reason=g('sa-reason').value.trim();
+  const pid=g('sa-pid').value, type=g('sa-type').value, qty=parseFloat(g('sa-qty').value), reason=g('sa-reason').value.trim();
   const adjBID = BID || ME?.buyerId; if(!pid||!adjBID)return;
   if(isNaN(qty)||qty<0){toast('Enter valid quantity','e');return;}
   const p=PRODS.find(x=>x.id===pid); if(!p)return;
@@ -2585,11 +2562,11 @@ function onSP(){
   const defaultPrice=parseFloat(sel.dataset.p||0);
   const customPriceInput=parseFloat(g('sm-custom-price')?.value||0);
   const price=customPriceInput>0?customPriceInput:defaultPrice;
-  const stock=parseInt(sel.dataset.q||0);
+  const stock=parseFloat(sel.dataset.q||0);
   const unitsPerPack=parseInt(sel.dataset.ups||sel.dataset.upp||0);
   g('sm-qty').value='1';
   g('sm-qty').max=stock;
-  g('sm-qty').step=unitsPerPack>1?'0.25':'1';
+  g('sm-qty').step='0.001';
   g('sm-info').textContent=stock+' in stock · Default price: '+fmt(price)+(unitsPerPack>1?' · '+unitsPerPack+' units/pack':'');
   if(g('sm-custom-price')){ g('sm-custom-price').placeholder=defaultPrice.toFixed(2); }
   g('sm-info').classList.remove('h');
@@ -2607,7 +2584,7 @@ function addToCart(){
   const defaultPrice=parseFloat(sel.dataset.p||0);
   const customPriceInput=parseFloat(g('sm-custom-price')?.value||0);
   const price=customPriceInput>0?customPriceInput:defaultPrice;
-  const stock=parseInt(sel.dataset.q||0);
+  const stock=parseFloat(sel.dataset.q||0);
   const name=(g('sm-prod-search')?.value||'').split(' (')[0].trim()||pid;
   const prod=PRODS.find(p=>p.id===pid);
   const discPct=parseFloat(g('sm-item-disc')?.value)||0;
@@ -2617,7 +2594,7 @@ function addToCart(){
 
   const existing=CART.find(c=>c.productId===pid);
   const alreadyQty=existing?existing.qty:0;
-  if(alreadyQty+qty>stock){ toast('Only '+(stock-alreadyQty)+' more units available','e'); return; }
+  if(alreadyQty+qty>stock+0.001){ toast('Only '+Math.round((stock-alreadyQty)*1000)/1000+' more units available','w'); }
 
   if(existing){
     existing.qty=Math.round((existing.qty+qty)*1000)/1000;
@@ -3376,7 +3353,7 @@ saveProd=async function(){
   if(!can('prod')){toast('⛔ No permission to edit products','e');return;}
   const effectiveProdBID=BID||ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first from the Branches page','e');return;}
   const name=g('pm-name').value.trim(),cat=g('pm-cat').value.trim();
-  const price=parseFloat(g('pm-price').value),qty=parseInt(g('pm-qty').value);
+  const price=parseFloat(g('pm-price').value),qty=parseFloat(g('pm-qty').value);
   const eid=g('pm-id').value;
   if(!name) return ferr('pm-err','Product name required.');
   if(!cat)  return ferr('pm-err','Category required.');
