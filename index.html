@@ -1528,28 +1528,9 @@ async function loadBuyers(forceRefresh){
 async function loadBranchData(forceRefresh){
   if(!BID) return;
 
-  // Try loading from localStorage cache first (zero Firebase reads)
+  // Try loading from localStorage cache as fallback only (for offline support)
+  // We always fetch fresh from Firebase so all phones see new products immediately
   const cacheKey='fv_cache_'+BID;
-  if(!forceRefresh){
-    try{
-      const cached=localStorage.getItem(cacheKey);
-      if(cached){
-        const data=JSON.parse(cached);
-        const age=(Date.now()-(data.savedAt||0))/1000/60;
-        const prods=data.prods||[];
-        // Only use cache if it has data AND is less than 2 hours old
-        if(age<480 && prods.length>0){  // 8 hours cache — reduces daily Firebase reads significantly
-          PRODS=prods;
-          SALES=data.sales||[];
-          STAFF=data.staff||[];
-          NOTIFS=data.notifs||[];
-          updBadges(); checkLowStock();
-          console.log('Loaded from cache ('+Math.round(age)+'min old).');
-          return;
-        }
-      }
-    }catch(e){}
-  }
 
   // Cache miss or force refresh — read from Firebase
   console.log('Loading from Firebase...');
@@ -1975,9 +1956,10 @@ function openSaleModal(){
 function onSP(){
   const sel=g('sm-prod'), opt=sel.options[sel.selectedIndex];
   if(!opt.value){ g('sm-info').classList.add('h'); return; }
-  const price=parseFloat(opt.dataset.p), qty=parseInt(opt.dataset.q);
+  const price=parseFloat(opt.dataset.p), qty=parseFloat(opt.dataset.q);
   g('sm-qty').value = '1';
   g('sm-qty').max = qty;
+  g('sm-qty').step = '0.125';
   g('sm-info').textContent = qty+' in stock · '+fmt(price)+' each';
   g('sm-info').classList.remove('h');
 }
@@ -1987,12 +1969,12 @@ function updTotal(){}  // kept for compatibility
 function addToCart(){
   const sel = g('sm-prod'), opt = sel.options[sel.selectedIndex];
   if(!opt.value){ toast('Select a product first','w'); return; }
-  const qty = parseInt(g('sm-qty').value);
-  if(!qty||qty<1){ toast('Enter a valid quantity','w'); return; }
+  const qty = parseFloat(g('sm-qty').value);
+  if(!qty||qty<=0){ toast('Enter a valid quantity','w'); return; }
 
   const pid   = opt.value;
   const price = parseFloat(opt.dataset.p);
-  const stock = parseInt(opt.dataset.q);
+  const stock = parseFloat(opt.dataset.q);
   const name  = opt.text.split(' (')[0];
   const prod  = PRODS.find(p=>p.id===pid);
 
@@ -2768,11 +2750,11 @@ function onSP(){
   const defaultPrice=parseFloat(sel.dataset.p||0);
   const customPriceInput=parseFloat(g('sm-custom-price')?.value||0);
   const price=customPriceInput>0?customPriceInput:defaultPrice;
-  const stock=parseInt(sel.dataset.q||0);
+  const stock=parseFloat(sel.dataset.q||0);
   const unitsPerPack=parseInt(sel.dataset.ups||sel.dataset.upp||0);
   g('sm-qty').value='1';
   g('sm-qty').max=stock;
-  g('sm-qty').step=unitsPerPack>1?'0.25':'1';
+  g('sm-qty').step='0.125';
   g('sm-info').textContent=stock+' in stock · Default price: '+fmt(price)+(unitsPerPack>1?' · '+unitsPerPack+' units/pack':'');
   if(g('sm-custom-price')){ g('sm-custom-price').placeholder=defaultPrice.toFixed(2); }
   g('sm-info').classList.remove('h');
@@ -2790,7 +2772,7 @@ function addToCart(){
   const defaultPrice=parseFloat(sel.dataset.p||0);
   const customPriceInput=parseFloat(g('sm-custom-price')?.value||0);
   const price=customPriceInput>0?customPriceInput:defaultPrice;
-  const stock=parseInt(sel.dataset.q||0);
+  const stock=parseFloat(sel.dataset.q||0);
   const name=(g('sm-prod-search')?.value||'').split(' (')[0].trim()||pid;
   const prod=PRODS.find(p=>p.id===pid);
   const discPct=parseFloat(g('sm-item-disc')?.value)||0;
