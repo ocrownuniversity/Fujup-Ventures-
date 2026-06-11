@@ -531,54 +531,6 @@ tbody tr:hover{background:var(--bg)}
         <div class="sc" style="border-left:3px solid #10B981" id="profit-card"><div class="sc-icon" style="background:#F0FDF4">📈</div><div style="flex:1"><div class="label">Profit</div><div class="value" id="st-profit" style="color:#059669">₦0</div><div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap" id="profit-tabs"><span onclick="setProfitTab('today',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:#2563EB;color:#fff">Today</span><span onclick="setProfitTab('week',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">Week</span><span onclick="setProfitTab('month',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">Month</span><span onclick="setProfitTab('all',this)" style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;background:var(--bord);color:var(--t3)">All</span></div><div class="sub" id="st-profit-s" style="color:#059669;margin-top:2px"></div></div></div>
         <div class="sc" style="border-left:3px solid #EF4444"><div class="sc-icon" style="background:#FEF2F2">⚠️</div><div><div class="label">Low / Out Stock</div><div class="value" id="st-l">0</div><div class="sub" style="color:#EF4444">Need restock</div></div></div>
       </div>
-      <!-- SA Profit Breakdown — Super Admin only -->
-      <div id="sa-profit-panel" style="display:none;margin-bottom:14px">
-        <div class="card">
-          <div class="card-head">
-            <h3>&#128202; Profit Breakdown</h3>
-            <div style="display:flex;gap:6px">
-              <button onclick="setSAProfitView('time')"   id="spv-time"   class="btn btn-b btn-sm">By Period</button>
-              <button onclick="setSAProfitView('branch')" id="spv-branch" class="btn btn-o btn-sm">By Branch</button>
-            </div>
-          </div>
-          <div id="sa-profit-time" style="padding:4px 0 8px">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 4px">
-              <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:12px;padding:14px 10px;text-align:center">
-                <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#059669;margin-bottom:5px">Today</div>
-                <div id="sa-profit-today" style="font-size:1.05rem;font-weight:800;color:#059669;font-family:'JetBrains Mono',monospace">&#8358;0</div>
-                <div style="margin-top:6px;padding-top:5px;border-top:1px solid #BBF7D0;font-size:.65rem;color:#6B7280">Revenue</div>
-                <div id="sa-rev-today" style="font-size:.78rem;font-weight:700;color:#374151">&#8358;0</div>
-                <div style="font-size:.65rem;color:#6B7280;margin-top:3px">Cost+Exp</div>
-                <div id="sa-cost-today" style="font-size:.78rem;font-weight:700;color:#EF4444">&#8358;0</div>
-                <div id="sa-margin-today" style="margin-top:6px;font-size:.68rem;font-weight:700;background:#D1FAE5;color:#059669;border-radius:6px;padding:2px 5px;display:inline-block">0%</div>
-              </div>
-              <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:14px 10px;text-align:center">
-                <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#2563EB;margin-bottom:5px">This Week</div>
-                <div id="sa-profit-week" style="font-size:1.05rem;font-weight:800;color:#2563EB;font-family:'JetBrains Mono',monospace">&#8358;0</div>
-                <div style="margin-top:6px;padding-top:5px;border-top:1px solid #BFDBFE;font-size:.65rem;color:#6B7280">Revenue</div>
-                <div id="sa-rev-week" style="font-size:.78rem;font-weight:700;color:#374151">&#8358;0</div>
-                <div style="font-size:.65rem;color:#6B7280;margin-top:3px">Cost+Exp</div>
-                <div id="sa-cost-week" style="font-size:.78rem;font-weight:700;color:#EF4444">&#8358;0</div>
-                <div id="sa-margin-week" style="margin-top:6px;font-size:.68rem;font-weight:700;background:#DBEAFE;color:#2563EB;border-radius:6px;padding:2px 5px;display:inline-block">0%</div>
-              </div>
-              <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:12px;padding:14px 10px;text-align:center">
-                <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#D97706;margin-bottom:5px">This Month</div>
-                <div id="sa-profit-month" style="font-size:1.05rem;font-weight:800;color:#D97706;font-family:'JetBrains Mono',monospace">&#8358;0</div>
-                <div style="margin-top:6px;padding-top:5px;border-top:1px solid #FED7AA;font-size:.65rem;color:#6B7280">Revenue</div>
-                <div id="sa-rev-month" style="font-size:.78rem;font-weight:700;color:#374151">&#8358;0</div>
-                <div style="font-size:.65rem;color:#6B7280;margin-top:3px">Cost+Exp</div>
-                <div id="sa-cost-month" style="font-size:.78rem;font-weight:700;color:#EF4444">&#8358;0</div>
-                <div id="sa-margin-month" style="margin-top:6px;font-size:.68rem;font-weight:700;background:#FFEDD5;color:#D97706;border-radius:6px;padding:2px 5px;display:inline-block">0%</div>
-              </div>
-            </div>
-            <div id="sa-expense-note" style="margin:10px 4px 0;padding:8px 12px;background:#F9FAFB;border-radius:8px;font-size:.72rem;color:#6B7280;text-align:center"></div>
-          </div>
-          <div id="sa-profit-branch" style="display:none;padding:4px 0 8px">
-            <div id="sa-branch-rows" style="padding:0 4px"></div>
-          </div>
-        </div>
-      </div>
-
       <div id="dash-grid" style="display:grid;grid-template-columns:1fr 340px;gap:14px">
         <div class="card"><div class="card-head"><h3>📈 Revenue – Last 7 Days</h3></div><div class="card-body"><canvas id="dash-chart" height="190"></canvas></div></div>
         <div class="card"><div class="card-head"><h3>⚠️ Low Stock</h3><button class="btn btn-o btn-sm" onclick="nav('products')">View all</button></div><div id="low-list" style="padding:0"></div></div>
@@ -1040,7 +992,7 @@ tbody tr:hover{background:var(--bg)}
   <div class="mbd">
     <div id="sa-info" style="font-weight:700;font-size:.9rem;color:var(--navy);margin-bottom:12px"></div>
     <div class="fg2"><label class="fl">Type</label><select class="fc" id="sa-type"><option value="add">➕ Add (Restock)</option><option value="remove">➖ Remove (Damage/Expiry)</option><option value="set">📌 Set Exact Quantity</option></select></div>
-    <div class="fg2"><label class="fl">Quantity</label><input class="fc" type="number" id="sa-qty" min="0" step="0.001"/></div>
+    <div class="fg2"><label class="fl">Quantity</label><input class="fc" type="number" id="sa-qty" min="0"/></div>
     <div class="fg2"><label class="fl">Reason</label><input class="fc" id="sa-reason" placeholder="e.g. Received from supplier"/></div>
     <input type="hidden" id="sa-pid"/>
   </div>
@@ -1731,8 +1683,6 @@ function renderDash(){
   // Show profit only to Super Admin
   const profitCard=document.getElementById('st-profit')?.closest('.sc');
   if(profitCard) profitCard.style.display=(SA_MODE)?'flex':'none';
-  const _sap=g('sa-profit-panel');if(_sap) _sap.style.display=SA_MODE?'block':'none';
-  if(SA_MODE) renderSAProfitBreakdown();
   if(SA_MODE && g('st-profit')){
     g('st-profit').textContent=fmt(tProfit);
     g('st-profit').style.color=tProfit>=0?'#059669':'#EF4444';
@@ -1753,60 +1703,17 @@ function renderDash(){
 }
 
 function renderSADash(){
+  // SA overview across all buyers
+  const totalP=BUYERS.reduce((a,b)=>a+(b.prodCount||0),0);
   const totalS=BUYERS.reduce((a,b)=>a+(b.saleCount||0),0);
   const totalR=BUYERS.reduce((a,b)=>a+(b.revenue||0),0);
-  g('st-p').textContent=BUYERS.length+' branches';
+  g('st-p').textContent=BUYERS.length+' buyers';
   g('st-s').textContent=totalS;
-  g('st-r').textContent=fmt(totalR);
+  g('st-r').textContent='₦'+totalR.toFixed(2);
   g('st-l').textContent=BUYERS.length;
   g('low-list').innerHTML='<div style="padding:14px;text-align:center;color:var(--t3);font-size:.83rem">Select a branch to view its inventory</div>';
-  g('dash-recent').innerHTML='<div class="empty" style="padding:24px"><div class="empty-icon">&#127962;</div><div class="empty-sub">Use the Buyers page to enter a branch</div></div>';
-  const panel=g('sa-profit-panel'); if(panel) panel.style.display='block';
-  renderSAProfitBreakdown();
+  g('dash-recent').innerHTML='<div class="empty" style="padding:24px"><div class="empty-icon">🏢</div><div class="empty-sub">Use the Buyers page to enter a buyer\'s inventory</div></div>';
 }
-
-function setSAProfitView(view){
-  g('sa-profit-time').style.display=view==='time'?'block':'none';
-  g('sa-profit-branch').style.display=view==='branch'?'block':'none';
-  g('spv-branch').className=view==='branch'?'btn btn-b btn-sm':'btn btn-o btn-sm';
-  g('spv-time').className=view==='time'?'btn btn-b btn-sm':'btn btn-o btn-sm';
-}
-
-function renderSAProfitBreakdown(){
-  if(!SALES||!PRODS) return;
-  const now=new Date();
-  const todayStr=now.toLocaleDateString('en-CA');
-  const weekStart=new Date(now); weekStart.setDate(now.getDate()-now.getDay());
-  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
-  const saleDay=s=>{const d=new Date(s.saleDate||s.timestamp);return isNaN(d)?'':d.toLocaleDateString('en-CA');};
-  const saleDate=s=>new Date(s.saleDate||s.timestamp);
-  const valid=SALES.filter(s=>s.status!=='voided'&&!s.voided);
-  function calcRevenue(arr){const seen=new Set();let r=0;for(const s of arr){if(s.receiptId){if(seen.has(s.receiptId))continue;seen.add(s.receiptId);}r+=s.grandTotal||s.total||0;}return Math.round(r*100)/100;}
-  function calcCost(arr){const seen=new Set();let c=0;for(const s of arr){if(s.receiptId){if(seen.has(s.receiptId))continue;seen.add(s.receiptId);}const p=PRODS.find(x=>x.id===s.productId);c+=(p?.costPrice||s.costPrice||0)*(s.quantity||1);}return Math.round(c*100)/100;}
-  function calcExp(arr){if(!EXPENSES||!EXPENSES.length)return 0;const days=[...new Set(arr.map(s=>saleDay(s)).filter(Boolean))];return Math.round(EXPENSES.filter(e=>days.includes(new Date(e.date).toLocaleDateString('en-CA'))).reduce((a,e)=>a+(e.amount||0),0)*100)/100;}
-  const todayS=valid.filter(s=>saleDay(s)===todayStr);
-  const weekS=valid.filter(s=>{const d=saleDate(s);return d>=weekStart&&d<=now;});
-  const monthS=valid.filter(s=>{const d=saleDate(s);return d>=monthStart&&d<=now;});
-  function setBlock(pfx,arr){
-    const rev=calcRevenue(arr),cost=calcCost(arr),exp=calcExp(arr),profit=rev-cost-exp;
-    const margin=rev>0?Math.round((profit/rev)*100):0;
-    const pc=profit>=0?'#059669':'#EF4444';
-    if(g('sa-profit-'+pfx)){g('sa-profit-'+pfx).textContent=fmt(profit);g('sa-profit-'+pfx).style.color=pc;}
-    if(g('sa-rev-'+pfx)) g('sa-rev-'+pfx).textContent=fmt(rev);
-    if(g('sa-cost-'+pfx)) g('sa-cost-'+pfx).textContent=fmt(cost+exp);
-    if(g('sa-margin-'+pfx)){g('sa-margin-'+pfx).textContent=margin+'% margin';g('sa-margin-'+pfx).style.color=pc;}
-  }
-  setBlock('today',todayS); setBlock('week',weekS); setBlock('month',monthS);
-  const totalExp=EXPENSES?EXPENSES.reduce((a,e)=>a+(e.amount||0),0):0;
-  const en=g('sa-expense-note');
-  if(en) en.textContent=totalExp>0?'Profit = Revenue − Cost Price − Expenses (₦'+fmt(totalExp)+' expenses deducted)':'Profit = Revenue − Cost Price of goods sold. Add expenses for more accurate figures.';
-  const br=g('sa-branch-rows');
-  if(br) br.innerHTML=BUYERS.length?BUYERS.map(b=>{
-    const bRev=b.revenue||0,bProfit=bRev-(b.costTotal||0),bMargin=bRev>0?Math.round((bProfit/bRev)*100):0,pc=bProfit>=0?'#059669':'#EF4444';
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--bord)"><div><div style="font-weight:700;font-size:.85rem;color:var(--navy)">'+esc(b.name||'Branch')+'</div><div style="font-size:.72rem;color:var(--t3)">'+( b.saleCount||0)+' sales · Rev: '+fmt(bRev)+'</div></div><div style="text-align:right"><div style="font-weight:800;font-size:.9rem;color:'+pc+'">'+fmt(bProfit)+'</div><div style="font-size:.7rem;color:'+pc+'">'+bMargin+'% margin</div></div></div>';
-  }).join(''):'<div style="padding:14px;text-align:center;color:var(--t3);font-size:.83rem">No branches loaded</div>';
-}
-
 
 // ── PRODUCTS ───────────────────────────────────────
 function renderProds(){
@@ -1885,7 +1792,7 @@ async function saveProd(){
   if(!can('prod')){toast('⛔ No permission','e');return;}
   const effectiveProdBID = BID || ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first','e');return;}
   const name=g('pm-name').value.trim(), cat=g('pm-cat').value.trim();
-  const price=parseFloat(g('pm-price').value), qty=parseFloat(g('pm-qty').value);
+  const price=parseFloat(g('pm-price').value), qty=parseInt(g('pm-qty').value);
   const eid=g('pm-id').value;
   if(!name) return ferr('pm-err','Product name is required.');
   if(!cat)  return ferr('pm-err','Category is required.');
@@ -1954,8 +1861,31 @@ async function saveProd(){
   }catch(e){
     const msg=e.message||'';
     if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')||msg.includes('Failed to get')){
-      // Products must be live — no offline saving so all phones see it immediately
-      ferr('pm-err','❌ Firebase quota reached. Products cannot be saved offline. Please try again later or when quota resets.');
+      // Save to offline queue — will sync when quota resets
+      const localId='local-'+Date.now();
+      if(eid){
+        queueOp({type:'updateProduct',bid:effectiveProdBID,id:eid,data});
+      } else {
+        PRODS.unshift({id:localId,...data,dateAdded:new Date().toISOString(),_offline:true});
+        queueOp({type:'addProduct',bid:effectiveProdBID,data:{...data,dateAdded:new Date().toISOString()}});
+        // Update cache with new product
+        try{const cKey='fv_cache_'+effectiveProdBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));} else {localStorage.setItem('fv_cache_'+effectiveProdBID,JSON.stringify({prods:PRODS,sales:SALES,staff:STAFF,notifs:NOTIFS,savedAt:Date.now()}));}}catch(ex){}
+        btn.textContent='✅ Saved!'; btn.style.background='#F59E0B';
+        const err=g('pm-err');
+        err.style.cssText='background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;border-radius:8px;padding:10px 13px;font-size:.85rem;font-weight:700;margin-bottom:11px;';
+        err.innerHTML='✅ "'+name+'" saved! Will sync to Firebase when quota resets.';
+        err.classList.remove('h');
+        // Refresh ALL pages that show product data
+        renderProds();
+        renderDash();
+        checkLowStock();
+        updateSyncBtn();
+        setTimeout(()=>{
+          closeM('prod-modal');
+          toast('✅ "'+name+'" added! (offline — syncs later)','s');
+        },1500);
+        return;
+      }
       resetBtn(eid?'Save Changes':'Add Product');
     } else {
       ferr('pm-err','Save failed: '+msg);
@@ -1995,7 +1925,7 @@ async function fixNegativeStock(){
 
 function openStockModal(pid){ if(!can('prod')){toast('⛔ No permission','e');return;} const p=PRODS.find(x=>x.id===pid); if(!p)return; g('sa-info').textContent=p.name+' — current: '+p.quantity+' units'; g('sa-pid').value=pid; g('sa-qty').value=''; g('sa-reason').value=''; g('sa-type').value='add'; openM('stock-modal'); }
 async function saveStockAdj(){
-  const pid=g('sa-pid').value, type=g('sa-type').value, qty=parseFloat(g('sa-qty').value), reason=g('sa-reason').value.trim();
+  const pid=g('sa-pid').value, type=g('sa-type').value, qty=parseInt(g('sa-qty').value), reason=g('sa-reason').value.trim();
   const adjBID = BID || ME?.buyerId; if(!pid||!adjBID)return;
   if(isNaN(qty)||qty<0){toast('Enter valid quantity','e');return;}
   const p=PRODS.find(x=>x.id===pid); if(!p)return;
@@ -2007,6 +1937,282 @@ async function saveStockAdj(){
   catch(e){ toast('Failed: '+e.message,'e'); }
 }
 
+// ── SALES ──────────────────────────────────────────
+function renderSales(){
+  const q=(g('ss')?.value||'').toLowerCase(), date=g('sd')?.value||'';
+  const list=SALES.filter(s=>(!q||s.productName?.toLowerCase().includes(q))&&(!date||fmtD(s.timestamp)===date));
+  g('sales-sub').textContent=list.length+' transactions';
+  const tb=g('sales-tb');
+  tb.innerHTML=list.length?list.map((s,i)=>`<tr><td style="color:var(--t4);font-size:.77rem">${list.length-i}</td><td class="td-n">${esc(s.productName)}</td><td class="td-m">${s.quantity}</td><td class="td-m">${fmt(s.unitPrice)}</td><td class="td-m td-gr">${fmt(s.total)}</td><td style="font-size:.81rem">${esc(s.cashier||'—')}</td><td style="color:var(--t4);font-size:.77rem">${fmtDT(s.timestamp)}</td><td><button class="btn btn-o btn-sm" style="font-size:.74rem" onclick="showRcpt('${s.id}')">🧾</button></td></tr>`).join('')
+  :'<tr><td colspan="8"><div class="empty"><div class="empty-icon">💳</div><div class="empty-sub">No sales yet</div></div></td></tr>';
+}
+
+// ── CART STATE ──────────────────────────────────────
+let CART = [];  // [{productId, name, category, qty, unitPrice, subtotal}]
+
+function openSaleModal(){
+  if(!can('sale')){toast('⛔ No permission to record sales','e');return;}
+  const activeBID = BID || ME?.buyerId;
+  if(!activeBID){toast('You need to be logged into a buyer account to record sales.','e');return;}
+  // Reset everything
+  CART = [];
+  g('sm-err').classList.add('h');
+  g('sm-info').classList.add('h');
+  g('sm-qty').value = '1';
+  if(g('sm-custom-price')) g('sm-custom-price').value='';
+  g('sm-cust').value = '';
+  g('cart-clear-btn').style.display = 'none';
+  renderCart();
+  // Populate product dropdown
+  const sel = g('sm-prod');
+  sel.innerHTML = '<option value="">— Select product —</option>' +
+    PRODS.filter(p=>p.quantity>-50).map(p=>  // allow negative stock products to still appear in search
+      `<option value="${p.id}" data-p="${p.price}" data-q="${p.quantity}">${esc(p.name)} (${p.quantity} in stock)</option>`
+    ).join('');
+  openM('sale-modal');
+}
+
+function onSP(){
+  const sel=g('sm-prod'), opt=sel.options[sel.selectedIndex];
+  if(!opt.value){ g('sm-info').classList.add('h'); return; }
+  const price=parseFloat(opt.dataset.p), qty=parseInt(opt.dataset.q);
+  g('sm-qty').value = '1';
+  g('sm-qty').max = qty;
+  g('sm-info').textContent = qty+' in stock · '+fmt(price)+' each';
+  g('sm-info').classList.remove('h');
+}
+
+function updTotal(){}  // kept for compatibility
+
+function addToCart(){
+  const sel = g('sm-prod'), opt = sel.options[sel.selectedIndex];
+  if(!opt.value){ toast('Select a product first','w'); return; }
+  const qty = parseInt(g('sm-qty').value);
+  if(!qty||qty<1){ toast('Enter a valid quantity','w'); return; }
+
+  const pid   = opt.value;
+  const price = parseFloat(opt.dataset.p);
+  const stock = parseInt(opt.dataset.q);
+  const name  = opt.text.split(' (')[0];
+  const prod  = PRODS.find(p=>p.id===pid);
+
+  // Check qty vs remaining stock (accounting for what's already in cart)
+  const alreadyInCart = CART.find(c=>c.productId===pid);
+  const alreadyQty    = alreadyInCart ? alreadyInCart.qty : 0;
+  if(alreadyQty + qty > stock){
+    toast('⚠️ Only '+(stock-alreadyQty)+' units left — proceeding anyway','w');
+  }
+
+  if(alreadyInCart){
+    // Update existing cart item
+    alreadyInCart.qty += qty;
+    alreadyInCart.subtotal = alreadyInCart.qty * alreadyInCart.unitPrice;
+  } else {
+    CART.push({
+      productId: pid,
+      name,
+      category: prod?.category||'',
+      qty,
+      unitPrice: price,
+      subtotal: qty * price
+    });
+  }
+
+  renderCart();
+  // Reset product selector for next item
+  g('sm-prod').value = '';
+  g('sm-qty').value  = '1';
+  g('sm-info').classList.add('h');
+  toast(name+' added to cart ✓','s');
+}
+
+function renderCart(){
+  const container = g('cart-container');
+  const emptyHint = g('cart-empty-hint');
+  const clearBtn  = g('cart-clear-btn');
+
+  if(CART.length === 0){
+    container.classList.add('h');
+    emptyHint.style.display = 'block';
+    clearBtn.style.display  = 'none';
+    return;
+  }
+  container.classList.remove('h');
+  emptyHint.style.display = 'none';
+  clearBtn.style.display  = 'inline-flex';
+
+  const grandTotal = CART.reduce((a,c)=>a+c.subtotal,0);
+
+  g('cart-items').innerHTML = CART.map((item,i)=>`
+    <div class="cart-row">
+      <div style="flex:1;min-width:0">
+        <div class="cart-item-name">${esc(item.name)}</div>
+        <div class="cart-item-detail">${fmt(item.unitPrice)} each · Subtotal: <strong style="color:#059669">${fmt(item.subtotal)}</strong></div>
+      </div>
+      <div class="cart-qty-wrap">
+        <button class="cart-qty-btn" onclick="changeCartQty(${i},-1)">−</button>
+        <span class="cart-qty-num">${item.qty}</span>
+        <button class="cart-qty-btn" onclick="changeCartQty(${i},1)">+</button>
+      </div>
+      <button class="cart-remove" onclick="removeFromCart(${i})" title="Remove">✕</button>
+    </div>`).join('');
+
+  g('cart-total').textContent = fmt(grandTotal);
+}
+
+function changeCartQty(index, delta){
+  const item  = CART[index]; if(!item) return;
+  const prod  = PRODS.find(p=>p.id===item.productId);
+  const stock = prod?.quantity||0;
+  const newQty= item.qty + delta;
+  if(newQty < 1){ removeFromCart(index); return; }
+  if(newQty > stock){ toast('⚠️ Only '+stock+' units in stock — proceeding anyway','w'); }
+  item.qty     = newQty;
+  item.subtotal= newQty * item.unitPrice;
+  renderCart();
+}
+
+function removeFromCart(index){
+  CART.splice(index,1);
+  renderCart();
+}
+
+function clearCart(){
+  if(!CART.length) return;
+  if(confirm('Clear all items from cart?')){ CART=[]; renderCart(); }
+}
+
+async function saveSale(){
+  if(!can('sale')){toast('⛔ No permission','e');return;}
+  const activeBID = BID || ME?.buyerId;
+  if(!activeBID){ ferr('sm-err','No buyer context. Please logout and log back in.'); return; }
+  if(CART.length === 0){ ferr('sm-err','Cart is empty — add at least one product.'); return; }
+
+  const cust         = g('sm-cust').value.trim();
+  const grandTotal   = CART.reduce((a,c)=>a+c.subtotal,0);
+  const receiptId    = 'RCP-'+Date.now().toString(36).toUpperCase();
+  const cashierName  = ME.name||'Staff';
+  const now          = firebase.firestore.FieldValue.serverTimestamp();
+
+  try{
+    const batch = db.batch();
+    const saleItems = [];
+
+    for(const item of CART){
+      const prod = PRODS.find(p=>p.id===item.productId);
+      if(!prod){ ferr('sm-err','Product "'+item.name+'" not found.'); return; }
+      if(item.qty > prod.quantity){ console.warn('Low stock for '+item.name+': selling '+item.qty+', have '+prod.quantity); } // warn only — allow sale to proceed
+
+      // Each cart item becomes one sale record
+      const saleRef = db.collection('buyers').doc(activeBID).collection('sales').doc();
+      batch.set(saleRef, {
+        productId:    item.productId,
+        productName:  item.name,
+        category:     item.category||'',
+        quantity:     item.qty,
+        unitPrice:    item.unitPrice,
+        total:        item.subtotal,
+        cashier:      cashierName,
+        customer:     cust,
+        receiptId,        // links items from same transaction
+        timestamp:    now,
+        buyerId:      activeBID
+      });
+
+      // Deduct stock
+      batch.update(
+        db.collection('buyers').doc(activeBID).collection('products').doc(item.productId),
+        {quantity: firebase.firestore.FieldValue.increment(-item.qty)}
+      );
+
+      saleItems.push({...item});
+    }
+
+    await batch.commit();
+
+    // Low stock checks
+    for(const item of CART){
+      const prod   = PRODS.find(p=>p.id===item.productId);
+      const newQty = (prod?.quantity||0) - item.qty;
+      if(newQty <= (prod?.lowAt||CFG.threshold))
+        addNotif('warn','Low Stock', item.name+' is low ('+newQty+' units left).');
+    }
+
+    closeM('sale-modal');
+    toast('Sale complete! '+fmt(grandTotal)+' · '+CART.length+' item'+(CART.length>1?'s':''),'s');
+
+    // Show combined receipt
+    setTimeout(()=>showCartReceipt(saleItems, cust, grandTotal, receiptId, cashierName), 400);
+
+    CART = [];
+
+  }catch(e){ ferr('sm-err','Failed: '+e.message); }
+}
+
+// ── RECEIPT ────────────────────────────────────────
+// Show receipt for a single sale (from sales history)
+function showRcpt(sid){
+  const s = SALES.find(x=>x.id===sid); if(!s) return;
+  if(s.receiptId){
+    const siblings = SALES.filter(x=>x.receiptId===s.receiptId);
+    const first    = siblings[0];
+    const items    = siblings.map(x=>({name:x.productName,qty:x.quantity,unitPrice:x.unitPrice,subtotal:Math.round((x.subtotal||x.total||x.unitPrice*x.quantity)*100)/100,discPct:x.discPct||0}));
+    const grandTotal = first.grandTotal||siblings.reduce((a,x)=>a+(x.total||0),0);
+    const billDisc = first.billDiscount||0;
+    // Pass splitPayments so receipt shows correct payment breakdown
+    showCartReceipt(items, s.customer, grandTotal, s.receiptId, s.cashier, s.saleDate||s.timestamp, first.splitPayments||[], billDisc);
+  } else {
+    showRcptData(s);
+  }
+}
+
+// Legacy single-item receipt
+function showRcptData(s){
+  const bars=Array.from({length:28},(_,i)=>`<div style="width:${i%3===0?3:2}px;height:${28+Math.sin(i)*8}px;background:#111;display:inline-block;margin:0 0.5px"></div>`).join('');
+  // Build payment section for single-item receipt
+  const _sp=s.splitPayments&&s.splitPayments.length>0?s.splitPayments:[];
+  const _payRows=_sp.length>1
+    ?`<div class="rcpt-row"><span style="color:#6B7280;font-weight:700">Payment</span><span style="font-weight:700">SPLIT</span></div>`+_sp.map(p=>`<div class="rcpt-row"><span style="color:#6B7280">→ ${(p.type||'cash').toUpperCase()}</span><span>${fmt(p.amount)}</span></div>`).join('')
+    :`<div class="rcpt-row"><span style="color:#6B7280">Payment</span><span>${(_sp[0]?.type||s.paymentType||'cash').toUpperCase()}</span></div>`;
+  g('rcpt-body').innerHTML=`<div class="rcpt"><div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div><div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${String(s.id||'').slice(-6).toUpperCase()}</div><hr class="rcpt-div"/><div class="rcpt-row"><span>${esc(s.productName)}</span></div><div class="rcpt-row"><span style="color:#6B7280">  ${s.quantity} × ${fmt(s.unitPrice)}</span><span>${fmt(s.total)}</span></div><hr class="rcpt-div"/><div class="rcpt-row rcpt-tot"><span>TOTAL</span><span>${fmt(s.grandTotal||s.total)}</span></div><hr class="rcpt-div"/>${_payRows}<div class="rcpt-row"><span style="color:#6B7280">Cashier</span><span>${esc(s.cashier||'—')}</span></div><div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${fmtDT(s.saleDate||s.timestamp)}</span></div>${s.customer?`<div class="rcpt-row"><span style="color:#6B7280">Customer</span><span>${esc(s.customer)}</span></div>`:''}<hr class="rcpt-div"/><div style="text-align:center;margin:4px 0">${bars}</div><div class="rcpt-foot">Thank you! · Fujup Venture</div></div>`;
+  openM('rcpt-modal');
+}
+
+// Multi-item cart receipt
+function showCartReceipt(items, customer, grandTotal, receiptId, cashier, timestamp){
+  const bars  = Array.from({length:28},(_,i)=>`<div style="width:${i%3===0?3:2}px;height:${28+Math.sin(i)*8}px;background:#111;display:inline-block;margin:0 0.5px"></div>`).join('');
+  const date  = fmtDT(timestamp||new Date());
+  const rcpNum= String(receiptId||Date.now()).slice(-8).toUpperCase();
+  const rows  = items.map(item=>`
+    <div class="rcpt-row"><span style="font-weight:700">${esc(item.name)}</span></div>
+    <div class="rcpt-row"><span style="color:#6B7280;padding-left:8px">${item.qty} × ${fmt(item.unitPrice)}</span><span>${fmt(item.subtotal)}</span></div>
+  `).join('<div style="height:4px"></div>');
+
+  g('rcpt-body').innerHTML=`
+    <div class="rcpt">
+      <div class="rcpt-logo">${esc(CFG.bizName||'Fujup Venture')}</div>
+      <div class="rcpt-sub">${esc(CFG.address||'')}${CFG.address?'<br>':''}Receipt #${rcpNum}</div>
+      <hr class="rcpt-div"/>
+      <div class="rcpt-row" style="font-size:.7rem;color:#9CA3AF;margin-bottom:6px">
+        <span>ITEM</span><span>AMOUNT</span>
+      </div>
+      ${rows}
+      <hr class="rcpt-div"/>
+      <div class="rcpt-row rcpt-tot">
+        <span>GRAND TOTAL</span>
+        <span>${fmt(grandTotal)}</span>
+      </div>
+      <hr class="rcpt-div"/>
+      <div class="rcpt-row"><span style="color:#6B7280">Items</span><span>${items.length} product${items.length>1?'s':''}</span></div>
+      <div class="rcpt-row"><span style="color:#6B7280">Cashier</span><span>${esc(cashier||'—')}</span></div>
+      ${customer?`<div class="rcpt-row"><span style="color:#6B7280">Customer</span><span>${esc(customer)}</span></div>`:''}
+      <div class="rcpt-row"><span style="color:#6B7280">Date</span><span>${date}</span></div>
+      <hr class="rcpt-div"/>
+      <div style="text-align:center;margin:4px 0">${bars}</div>
+      <div class="rcpt-foot">Thank you for your purchase!<br>Fujup Venture</div>
+    </div>`;
+  openM('rcpt-modal');
+}
 function printRcpt(){ const w=window.open('','_blank','width=380,height=600'); w.document.write('<html><head><title>Receipt</title><style>body{font-family:monospace;padding:16px;margin:0}*{box-sizing:border-box}</style></head><body>'+g('rcpt-body').innerHTML+'<script>window.onload=()=>window.print()</'+'script></body></html>'); w.document.close(); }
 
 // ── REPORTS ────────────────────────────────────────
@@ -2562,11 +2768,11 @@ function onSP(){
   const defaultPrice=parseFloat(sel.dataset.p||0);
   const customPriceInput=parseFloat(g('sm-custom-price')?.value||0);
   const price=customPriceInput>0?customPriceInput:defaultPrice;
-  const stock=parseFloat(sel.dataset.q||0);
+  const stock=parseInt(sel.dataset.q||0);
   const unitsPerPack=parseInt(sel.dataset.ups||sel.dataset.upp||0);
   g('sm-qty').value='1';
   g('sm-qty').max=stock;
-  g('sm-qty').step='0.001';
+  g('sm-qty').step=unitsPerPack>1?'0.25':'1';
   g('sm-info').textContent=stock+' in stock · Default price: '+fmt(price)+(unitsPerPack>1?' · '+unitsPerPack+' units/pack':'');
   if(g('sm-custom-price')){ g('sm-custom-price').placeholder=defaultPrice.toFixed(2); }
   g('sm-info').classList.remove('h');
@@ -2584,7 +2790,7 @@ function addToCart(){
   const defaultPrice=parseFloat(sel.dataset.p||0);
   const customPriceInput=parseFloat(g('sm-custom-price')?.value||0);
   const price=customPriceInput>0?customPriceInput:defaultPrice;
-  const stock=parseFloat(sel.dataset.q||0);
+  const stock=parseInt(sel.dataset.q||0);
   const name=(g('sm-prod-search')?.value||'').split(' (')[0].trim()||pid;
   const prod=PRODS.find(p=>p.id===pid);
   const discPct=parseFloat(g('sm-item-disc')?.value)||0;
@@ -2594,7 +2800,7 @@ function addToCart(){
 
   const existing=CART.find(c=>c.productId===pid);
   const alreadyQty=existing?existing.qty:0;
-  if(alreadyQty+qty>stock+0.001){ toast('Only '+Math.round((stock-alreadyQty)*1000)/1000+' more units available','w'); }
+  if(alreadyQty+qty>stock){ toast('Only '+(stock-alreadyQty)+' more units available','e'); return; }
 
   if(existing){
     existing.qty=Math.round((existing.qty+qty)*1000)/1000;
@@ -3353,7 +3559,7 @@ saveProd=async function(){
   if(!can('prod')){toast('⛔ No permission to edit products','e');return;}
   const effectiveProdBID=BID||ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first from the Branches page','e');return;}
   const name=g('pm-name').value.trim(),cat=g('pm-cat').value.trim();
-  const price=parseFloat(g('pm-price').value),qty=parseFloat(g('pm-qty').value);
+  const price=parseFloat(g('pm-price').value),qty=parseInt(g('pm-qty').value);
   const eid=g('pm-id').value;
   if(!name) return ferr('pm-err','Product name required.');
   if(!cat)  return ferr('pm-err','Category required.');
@@ -4031,21 +4237,23 @@ if('serviceWorker' in navigator){
   window.addEventListener('load', async ()=>{
     try{
       const reg = await navigator.serviceWorker.register('sw.js');
-      // Poll for updates every 60 seconds — catches new deployments quickly
-      setInterval(()=>{ reg.update(); }, 60000);
+      console.log('[PWA] Service worker registered:', reg.scope);
+      // Check for updates every time app loads
+      reg.addEventListener('updatefound', ()=>{
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', ()=>{
+          if(newWorker.state==='installed' && navigator.serviceWorker.controller){
+            // New version available — show update toast
+            if(typeof toast === 'function') toast('🔄 Update available — reload to apply','i');
+          }
+        });
+      });
     }catch(e){ console.warn('[PWA] SW registration failed:', e); }
   });
-  // When SW sends NEW_VERSION — auto reload silently, no user action needed
+  // Listen for SW telling us we are offline/online
   navigator.serviceWorker.addEventListener('message', e=>{
-    if(e.data?.type==='NEW_VERSION'){
-      // Small delay so the SW finishes activating before we reload
-      setTimeout(()=>{ window.location.reload(); }, 500);
-    }
-  });
-  // Reload when controller changes (new SW took over)
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
-    if(!refreshing){ refreshing=true; window.location.reload(); }
+    if(e.data?.type==='OFFLINE') if(typeof toast==='function') toast('📴 You are offline — changes saved locally','i');
+    if(e.data?.type==='ONLINE')  if(typeof toast==='function') toast('✅ Back online — syncing...','s');
   });
 }
 // ── PWA INSTALL PROMPT ──
