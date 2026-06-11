@@ -935,7 +935,7 @@ tbody tr:hover{background:var(--bg)}
         </div>
         <div>
           <label class="fl">Qty</label>
-          <input class="fc" type="number" id="sm-qty" placeholder="1" min="0.001" step="0.001" style="font-size:.9rem"/>
+          <input class="fc" type="number" id="sm-qty" placeholder="1" min="0.25" step="0.25" style="font-size:.9rem"/>
         </div>
         <div>
           <label class="fl">Price (₦)</label>
@@ -1586,7 +1586,7 @@ async function loadBranchData(forceRefresh){
         const age=(Date.now()-(data.savedAt||0))/1000/60;
         const prods=data.prods||[];
         // Only use cache if it has data AND is less than 2 hours old
-        if(false && age<480 && prods.length>0){  // DISABLED: products must always load fresh so all phones see new products immediately
+        if(age<480 && prods.length>0){  // 8 hours cache — reduces daily Firebase reads significantly
           PRODS=prods;
           SALES=data.sales||[];
           STAFF=data.staff||[];
@@ -2402,7 +2402,6 @@ document.addEventListener('keydown',e=>{
 // ── CUSTOMERS STATE ──────────────────────────────────
 let CUSTOMERS = [];
 let CUST_UNSUB = null;
-let showCartReceipt = function(){}; // placeholder — overridden below
 
 async function subscribeCustomers(){
   const b=BID||ME?.buyerId; if(!b) return;
@@ -2595,8 +2594,7 @@ function addToCart(){
 
   const existing=CART.find(c=>c.productId===pid);
   const alreadyQty=existing?existing.qty:0;
-  // Use 0.001 tolerance for floating point (e.g. 0.5 + 0.125 should work fine)
-  if(alreadyQty+qty>stock+0.001){ toast('Only '+Math.round((stock-alreadyQty)*1000)/1000+' more units available. Current stock: '+stock,'w'); return; }
+  if(alreadyQty+qty>stock+0.001){ toast('Only '+Math.round((stock-alreadyQty)*1000)/1000+' more units available','w'); }
 
   if(existing){
     existing.qty=Math.round((existing.qty+qty)*1000)/1000;
@@ -2772,7 +2770,7 @@ function openSaleModal(){
   renderCart();
   const sel=g('sm-prod');
   sel.innerHTML='<option value="">— Select product —</option>'+
-    PRODS.filter(p=>p.quantity>0.001).map(p=>
+    PRODS.filter(p=>p.quantity>0).map(p=>
       `<option value="${p.id}" data-p="${p.price}" data-q="${p.quantity}" data-upp="${p.unitsPerPack||0}">${esc(p.name)} (${p.quantity} in stock)</option>`
     ).join('');
   openM('sale-modal');
@@ -2878,7 +2876,7 @@ async function saveSale(){
     for(const item of CART){
       const prod=PRODS.find(p=>p.id===item.productId);
       if(!prod){ferr('sm-err','Product "'+item.name+'" not found.');return;}
-      if(item.qty>prod.quantity+0.001){ferr('sm-err','Not enough stock for "'+item.name+'". Only '+prod.quantity+' available (you need '+item.qty+').');return;}
+      if(item.qty>prod.quantity){ferr('sm-err','Not enough stock for "'+item.name+'". Only '+prod.quantity+' available.');return;}
       const itemShare=subtotal>0?(item.subtotal/subtotal):1/CART.length;
       const itemDisc=Math.round(billDiscAmt*itemShare*100)/100;
       const saleRef=db.collection('buyers').doc(activeBID).collection('sales').doc();
@@ -3160,22 +3158,6 @@ function renderSales(){
       </div>
     </div>`;
   }).join('');
-}
-
-// ── SHOW RECEIPT FROM SALES LIST ─────────────────
-function showRcpt(saleId){
-  // Find this sale and all siblings in same receipt group
-  const sale=SALES.find(s=>s.id===saleId); if(!sale) return;
-  const items=sale.receiptId
-    ?SALES.filter(s=>s.receiptId===sale.receiptId&&s.status!=='voided')
-    :[sale];
-  const cartItems=items.map(s=>({
-    name:s.productName, qty:s.quantity, unitPrice:s.unitPrice||s.unitPrice||(s.total/s.quantity)||0,
-    subtotal:s.total, discPct:s.itemDiscountPct||0
-  }));
-  showCartReceipt(cartItems, sale.customer, sale.grandTotal||sale.total,
-    sale.receiptId||sale.id, sale.cashier, sale.saleDate||sale.timestamp,
-    sale.splitPayments||[], sale.billDiscountAmt||0);
 }
 
 // ── VOID / CORRECT SALE ───────────────────────────
