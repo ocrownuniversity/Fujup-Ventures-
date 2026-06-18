@@ -1088,11 +1088,18 @@ tbody tr:hover{background:var(--bg)}
   <div class="mh"><h3>💳 Record Credit Payment</h3><button class="mx" onclick="closeM('credit-pay-modal')">✕</button></div>
   <div class="mbd">
     <div id="cpm-err" class="ferr h"></div>
-    <div class="fg2"><label class="fl">Customer Name *</label>
-      <input class="fc" id="cpm-customer" placeholder="Customer name" list="cpm-cust-dl"/>
+    <div class="fg2"><label class="fl">Customer</label>
+      <input class="fc" id="cpm-customer" readonly style="background:#F3F4F6;font-weight:700"/>
       <datalist id="cpm-cust-dl"></datalist>
     </div>
-    <div class="fg2"><label class="fl">Amount Paid (₦) *</label><input class="fc" type="number" id="cpm-amount" placeholder="0.00" min="0" step="0.01"/></div>
+    <div id="cpm-balance-box" style="display:flex;justify-content:space-between;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:10px 14px;margin:4px 0 12px">
+      <span style="font-size:.82rem;color:#991B1B;font-weight:600">Balance owed</span>
+      <span id="cpm-balance" style="font-weight:800;color:#DC2626;font-family:'JetBrains Mono',monospace">₦0</span>
+    </div>
+    <div class="fg2"><label class="fl">Amount Paid (₦) *</label>
+      <input class="fc" type="number" id="cpm-amount" placeholder="0.00" min="0" step="0.01"/>
+      <button type="button" onclick="payFullCreditBalance()" style="margin-top:6px;border:none;background:#ECFDF5;color:#059669;font-weight:700;font-size:.78rem;padding:6px 10px;border-radius:8px;cursor:pointer">Pay full balance</button>
+    </div>
     <div class="fg2"><label class="fl">Payment Method</label>
       <select class="fc" id="cpm-method">
         <option value="cash">💵 Cash</option>
@@ -4131,15 +4138,22 @@ function renderCreditSummary(){
   const el=g('cr-customer-list');
   if(!el) return;
   const entries=Object.entries(custMap);
+  // Store balances keyed by normalized name so the per-customer Pay button
+  // can look up the exact owed amount and display name reliably.
+  CR_BAL_MAP={};
+  entries.forEach(([key,d])=>{ CR_BAL_MAP[key]={display:d.display,owed:d.owed,paid:d.paid,bal:Math.max(d.owed-d.paid,0)}; });
   el.innerHTML=entries.length?entries.map(([key,d])=>{
     const bal=Math.max(d.owed-d.paid,0);
-    return`<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bord)">
+    return`<div class="cr-row" onclick="openCreditPayModalFor('${key.replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bord);cursor:pointer">
       <div><div style="font-weight:700;font-size:.88rem">${esc(d.display)}</div>
         <div style="font-size:.75rem;color:var(--t3)">Owed: ${fmt(d.owed)} · Paid: ${fmt(d.paid)}</div>
       </div>
-      <div style="text-align:right">
-        <div style="font-weight:800;color:${bal>0?'#EF4444':'#059669'};font-family:'JetBrains Mono',monospace">${fmt(bal)}</div>
-        <div style="font-size:.7rem;color:var(--t3)">${bal>0?'Balance due':'Cleared ✅'}</div>
+      <div style="text-align:right;display:flex;align-items:center;gap:8px">
+        <div>
+          <div style="font-weight:800;color:${bal>0?'#EF4444':'#059669'};font-family:'JetBrains Mono',monospace">${fmt(bal)}</div>
+          <div style="font-size:.7rem;color:var(--t3)">${bal>0?'Balance due':'Cleared ✅'}</div>
+        </div>
+        ${bal>0?'<span style="background:#059669;color:#fff;font-size:.7rem;font-weight:700;padding:5px 10px;border-radius:8px;white-space:nowrap">💳 Pay</span>':''}
       </div>
     </div>`;
   }).join('')
@@ -4163,15 +4177,44 @@ function renderCreditPayments(){
   :'<tr><td colspan="7"><div class="empty"><div class="empty-icon">💳</div><div class="empty-sub">No payments recorded yet</div></div></td></tr>';
 }
 
-function openCreditPayModal(){
+let CR_BAL_MAP={};       // normalized-name -> {display, owed, paid, bal}
+let CR_ACTIVE_KEY='';    // normalized name of the customer currently being paid
+
+function openCreditPayModalFor(key){
+  const info=CR_BAL_MAP[key];
+  if(!info){ toast('Customer balance not found — please refresh','w'); return; }
+  CR_ACTIVE_KEY=key;
   g('cpm-err').classList.add('h');
+  g('cpm-customer').value=info.display;
+  g('cpm-amount').value='';
+  g('cpm-note').value='';
+  g('cpm-method').value='cash';
+  g('cpm-date').value=new Date().toLocaleDateString('en-CA');
+  g('cpm-balance').textContent=fmt(info.bal);
+  if(g('cpm-balance-box')) g('cpm-balance-box').style.display=info.bal>0?'flex':'none';
+  openM('credit-pay-modal');
+}
+
+// Fallback for any old call sites — opens with a blank/unlocked customer field
+function openCreditPayModal(){
+  CR_ACTIVE_KEY='';
+  g('cpm-err').classList.add('h');
+  g('cpm-customer').removeAttribute('readonly');
+  g('cpm-customer').style.background='';
   g('cpm-customer').value=''; g('cpm-amount').value=''; g('cpm-note').value='';
   g('cpm-method').value='cash';
   g('cpm-date').value=new Date().toLocaleDateString('en-CA');
+  if(g('cpm-balance-box')) g('cpm-balance-box').style.display='none';
   // Populate customer datalist with credit customers (incl. split-payment credit)
   const creditCustomers=[...new Set(SALES.filter(s=>(s.paymentType||'').toLowerCase()==='credit'||(s.splitPayments&&s.splitPayments.some(sp=>(sp.type||'').toLowerCase()==='credit'))).map(s=>s.customer||'').filter(Boolean))];
   const dl=g('cpm-cust-dl'); if(dl) dl.innerHTML=creditCustomers.map(c=>`<option value="${esc(c)}">`).join('');
   openM('credit-pay-modal');
+}
+
+function payFullCreditBalance(){
+  const info=CR_BAL_MAP[CR_ACTIVE_KEY];
+  if(!info){ toast('Open a customer\'s payment first','w'); return; }
+  g('cpm-amount').value=info.bal.toFixed(2);
 }
 
 async function saveCreditPayment(){
@@ -4187,6 +4230,11 @@ async function saveCreditPayment(){
   const norm=n=>(n||'').trim().toLowerCase().replace(/\s+/g,' ');
   const matchExisting=creditCustomers.find(c=>norm(c)===norm(customer));
   if(matchExisting) customer=matchExisting;
+  // Warn (but don't block) if paying more than what's currently owed
+  const activeBal=CR_BAL_MAP[CR_ACTIVE_KEY]?.bal;
+  if(typeof activeBal==='number' && amount>activeBal+0.01){
+    if(!confirm('This customer only owes '+fmt(activeBal)+'. Record '+fmt(amount)+' anyway?')) return;
+  }
   const data={
     customer, amount, method:g('cpm-method').value,
     note:g('cpm-note').value.trim(),
