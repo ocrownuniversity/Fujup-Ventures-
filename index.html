@@ -267,6 +267,8 @@ tbody tr:hover{background:var(--bg)}
 .report-tabs{display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:16px;width:fit-content}
 .rtab{padding:7px 16px;border-radius:8px;font-size:.84rem;font-weight:700;color:var(--t3);cursor:pointer;transition:all .2s}
 .rtab.on{background:var(--surf);color:#2563EB;box-shadow:var(--sh)}
+.ptab{padding:7px 16px;border-radius:8px;font-size:.84rem;font-weight:700;color:var(--t3);cursor:pointer;transition:all .2s;background:var(--bg)}
+.ptab.on{background:var(--surf);color:#2563EB;box-shadow:var(--sh)}
 
 /* ── RECEIPT ── */
 .rcpt{font-family:'JetBrains Mono',monospace;background:#fff;color:#111;border-radius:10px;padding:20px;max-width:300px;margin:0 auto;border:1px dashed #D1D5DB}
@@ -657,6 +659,51 @@ tbody tr:hover{background:var(--bg)}
         <div class="sc"><div><div class="label">Revenue</div><div class="value" id="rpt-r">₦0</div></div></div>
         <div class="sc"><div><div class="label">Avg Order</div><div class="value" id="rpt-a">₦0</div></div></div>
         <div class="sc"><div><div class="label">Units Sold</div><div class="value" id="rpt-u">0</div></div></div>
+      </div>
+      <!-- Profit Report — date-range profit calculation -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-head"><h3>💰 Profit Report</h3></div>
+        <div class="card-body" style="padding:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px" id="profit-rpt-tabs">
+            <span class="ptab on" onclick="setProfitPeriod('today',this)">Today</span>
+            <span class="ptab" onclick="setProfitPeriod('yesterday',this)">Yesterday</span>
+            <span class="ptab" onclick="setProfitPeriod('week',this)">This Week</span>
+            <span class="ptab" onclick="setProfitPeriod('month',this)">This Month</span>
+            <span class="ptab" onclick="setProfitPeriod('custom',this)">Custom Range</span>
+          </div>
+          <div id="profit-custom-box" style="display:none;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <input type="date" class="fsel" id="profit-from" title="From date"/>
+            <span style="color:var(--t3);font-size:.85rem">to</span>
+            <input type="date" class="fsel" id="profit-to" title="To date"/>
+            <button class="btn btn-b btn-sm" onclick="runProfitReport()">Calculate</button>
+          </div>
+          <div id="profit-rpt-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">
+            <div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center;border:1px solid var(--bord)">
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">Total Sales</div>
+              <div style="font-size:1rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="pr-sales">₦0</div>
+            </div>
+            <div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center;border:1px solid var(--bord)">
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">Cost of Goods</div>
+              <div style="font-size:1rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="pr-cogs">₦0</div>
+            </div>
+            <div style="background:#F0FDF4;border-radius:10px;padding:12px;text-align:center;border:1px solid #BBF7D0">
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#059669;margin-bottom:4px">Gross Profit</div>
+              <div style="font-size:1rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#059669" id="pr-gross">₦0</div>
+            </div>
+            <div style="background:#FEF2F2;border-radius:10px;padding:12px;text-align:center;border:1px solid #FECACA">
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#DC2626;margin-bottom:4px">Expenses</div>
+              <div style="font-size:1rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#DC2626" id="pr-exp">₦0</div>
+            </div>
+            <div style="background:#EFF6FF;border-radius:10px;padding:12px;text-align:center;border:1px solid #BFDBFE">
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2563EB;margin-bottom:4px">Net Profit</div>
+              <div style="font-size:1rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="pr-net">₦0</div>
+            </div>
+            <div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center;border:1px solid var(--bord)">
+              <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">Transactions</div>
+              <div style="font-size:1rem;font-weight:800;font-family:'JetBrains Mono',monospace" id="pr-count">0</div>
+            </div>
+          </div>
+        </div>
       </div>
       <!-- Payment Method Breakdown -->
       <div class="card" style="margin-bottom:14px">
@@ -1605,6 +1652,7 @@ function nav(pg){
   // Only load customers fresh when navigating (small collection)
   if(pg==='customers') subscribeCustomers();
   if(pg==='credits'){ if(g('cr-date-filter')) g('cr-date-filter').value=''; loadCreditPayments(true); }
+  if(pg==='reports') runProfitReport();
   closeSB();
 }
 function loadPage(pg){ nav(pg); }
@@ -1653,11 +1701,13 @@ function renderDash(){
   const lw=PRODS.filter(p=>p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold));
   const ot=PRODS.filter(p=>p.quantity===0);
   // Calculate profit for all periods
+  // PERF: build the product cost lookup once (was PRODS.find() inside the sales loop,
+  // i.e. O(sales * products) — very slow once a branch has a large sales history).
+  const _profCostMap=new Map(PRODS.map(p=>[p.id,p.costPrice||0]));
   function calcProfit(salesList){
     let p=0;
     for(const s of salesList){
-      const prod=PRODS.find(x=>x.id===s.productId);
-      const cost=(prod?.costPrice||0)*s.quantity;
+      const cost=(_profCostMap.get(s.productId)||0)*s.quantity;
       p+=(s.total||0)-cost;
     }
     return Math.round(p*100)/100;
@@ -2299,6 +2349,87 @@ function renderRpt(){
   const days=RPT_MODE==='daily'?1:RPT_MODE==='weekly'?7:RPT_MODE==='monthly'?30:60;
   drawChart('rpt-chart',days,list);
   adjGrids();
+}
+
+// ── PROFIT REPORT (date-range) ──────────────────────
+// Uses a direct, targeted Firestore range query (indexed on 'timestamp', no
+// composite index needed) instead of relying on whatever happens to already be
+// loaded in the in-memory SALES array — this keeps it accurate and fast no
+// matter how large the branch's full sales history is.
+let PROFIT_PERIOD='today';
+function setProfitPeriod(period, el){
+  PROFIT_PERIOD=period;
+  document.querySelectorAll('#profit-rpt-tabs .ptab').forEach(s=>s.classList.remove('on'));
+  if(el) el.classList.add('on');
+  const box=g('profit-custom-box');
+  if(box) box.style.display=(period==='custom')?'flex':'none';
+  if(period!=='custom') runProfitReport();
+}
+async function fetchSalesInRange(fromDate,toDate){
+  const activeBID=BID||ME?.buyerId;
+  if(!activeBID||!db||!firebase) return [];
+  const fromTS=firebase.firestore.Timestamp.fromDate(fromDate);
+  const toTS=firebase.firestore.Timestamp.fromDate(toDate);
+  const snap=await db.collection('buyers').doc(activeBID).collection('sales')
+    .where('timestamp','>=',fromTS).where('timestamp','<=',toTS).get();
+  return snap.docs.map(d=>{
+    const dt=d.data();
+    return {id:d.id,...dt,timestamp:dt.timestamp?.toDate?.()||new Date(dt.timestamp||Date.now())};
+  });
+}
+async function computeProfitReport(fromDate,toDate){
+  const remoteSales=await fetchSalesInRange(fromDate,toDate);
+  // Also include any not-yet-synced offline sales sitting in memory for this range
+  // (these never reached Firebase yet so the query above can't see them).
+  const localOnly=SALES.filter(s=>String(s.id).startsWith('local-')&&s.status!=='voided'&&!s.voided)
+    .filter(s=>{const t=new Date(s.saleDate||s.timestamp); return t>=fromDate&&t<=toDate;});
+  const all=[...remoteSales.filter(s=>s.status!=='voided'&&!s.voided),...localOnly];
+  const costMap=new Map(PRODS.map(p=>[p.id,p.costPrice||0]));
+  const seen=new Set(); let totalSales=0, cogs=0, txCount=0;
+  for(const s of all){
+    if(s.receiptId){ if(seen.has(s.receiptId)) continue; seen.add(s.receiptId); }
+    totalSales+=s.grandTotal||s.total||0;
+    txCount++;
+  }
+  for(const s of all){ cogs+=(costMap.get(s.productId)||0)*(s.quantity||0); }
+  totalSales=Math.round(totalSales*100)/100;
+  cogs=Math.round(cogs*100)/100;
+  const grossProfit=Math.round((totalSales-cogs)*100)/100;
+  const expenses=Math.round(EXPENSES.filter(e=>{const d=new Date(e.date); return d>=fromDate&&d<=toDate;}).reduce((a,e)=>a+(e.amount||0),0)*100)/100;
+  const netProfit=Math.round((grossProfit-expenses)*100)/100;
+  return {totalSales,cogs,grossProfit,expenses,netProfit,txCount};
+}
+async function runProfitReport(){
+  if(!can('rpt')) return;
+  const now=new Date();
+  let from,to;
+  if(PROFIT_PERIOD==='today'){ from=new Date(now.getFullYear(),now.getMonth(),now.getDate()); to=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59,999); }
+  else if(PROFIT_PERIOD==='yesterday'){ const y=new Date(now); y.setDate(now.getDate()-1); from=new Date(y.getFullYear(),y.getMonth(),y.getDate()); to=new Date(y.getFullYear(),y.getMonth(),y.getDate(),23,59,59,999); }
+  else if(PROFIT_PERIOD==='week'){ from=new Date(now); from.setDate(now.getDate()-now.getDay()); from.setHours(0,0,0,0); to=now; }
+  else if(PROFIT_PERIOD==='month'){ from=new Date(now.getFullYear(),now.getMonth(),1); to=now; }
+  else { // custom
+    const fVal=g('profit-from')?.value, tVal=g('profit-to')?.value;
+    if(!fVal||!tVal){ toast('Select both a From and To date','w'); return; }
+    from=new Date(fVal); from.setHours(0,0,0,0);
+    to=new Date(tVal); to.setHours(23,59,59,999);
+    if(from>to){ toast('From date must be before To date','w'); return; }
+  }
+  const resBox=g('profit-rpt-results');
+  const prevHtml=resBox?resBox.innerHTML:'';
+  if(resBox) resBox.style.opacity='.5';
+  try{
+    const r=await computeProfitReport(from,to);
+    if(resBox) resBox.style.opacity='1';
+    if(g('pr-sales')) g('pr-sales').textContent=fmt(r.totalSales);
+    if(g('pr-cogs'))  g('pr-cogs').textContent=fmt(r.cogs);
+    if(g('pr-gross')) g('pr-gross').textContent=fmt(r.grossProfit);
+    if(g('pr-exp'))   g('pr-exp').textContent=fmt(r.expenses);
+    if(g('pr-net')){ g('pr-net').textContent=fmt(r.netProfit); g('pr-net').style.color=r.netProfit>=0?'#059669':'#EF4444'; }
+    if(g('pr-count')) g('pr-count').textContent=r.txCount;
+  }catch(e){
+    if(resBox) resBox.style.opacity='1';
+    toast('Failed to calculate profit: '+e.message,'e');
+  }
 }
 
 // ── CHART ──────────────────────────────────────────
@@ -3179,34 +3310,14 @@ async function saveSale(){
   }catch(e){
     const msg=e.message||'';
     if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')||msg.includes('Failed to get')){
-      // Save sale to offline queue and local array
-      const nowDate=new Date();
-      for(const item of CART){
-        const saleId='local-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-        const saleData={
-          productId:item.productId, productName:item.name, category:item.category||'',
-          quantity:item.qty, unitPrice:item.unitPrice, discountAmt:item.discAmt||0,
-          total:item.subtotal, grandTotal, receiptId,
-          paymentType:splitPayments[0]?.type||'cash', splitPayments,
-          cashier:cashierName, customer:cust,
-          timestamp:nowDate, saleDate:nowDate.toISOString(),
-          status:'completed', buyerId:activeBID, _offline:true
-        };
-        SALES.unshift({id:saleId,...saleData});
-        queueOp({type:'addSale',bid:activeBID,id:saleId,data:saleData});
-        // Reduce product qty locally
-        const prod=PRODS.find(p=>p.id===item.productId);
-        if(prod) prod.quantity=Math.round((prod.quantity-item.qty)*100)/100;
-        queueOp({type:'deductStock',bid:activeBID,id:item.productId,delta:item.qty}); // use delta not absolute — prevents double-deduction
-      }
-      // Update cache
-      try{const cKey='fv_cache_'+activeBID;const c=localStorage.getItem(cKey);if(c){const d=JSON.parse(c);d.sales=SALES;d.prods=PRODS;d.savedAt=Date.now();localStorage.setItem(cKey,JSON.stringify(d));}}catch(ex){}
-      closeM('sale-modal');
-      toast('⚠️ Sale saved offline! Will sync to Firebase when quota resets.','w');
-      const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
-      if(cur==='sales') renderSales();
-      if(cur==='dashboard') renderDash();
-      CART=[];
+      // ── OFFLINE SALES TEMPORARILY DISABLED (client request) ──
+      // Previously this branch created a local-only sale and queued it for later
+      // sync. That is disabled for now: we no longer create offline sales.
+      // The cart is left intact (nothing lost) so the user can retry once online.
+      // NOTE: this does NOT touch any offline sales already queued from before —
+      // those still sync normally via the existing Sync button / auto-sync.
+      ferr('sm-err','Offline sales are temporarily unavailable. Please check your connection and try again once online.');
+      toast('📴 Offline sales are temporarily unavailable. Please use online sales.','w');
     } else {
       ferr('sm-err','Failed: '+msg);
     }
@@ -3250,47 +3361,60 @@ function buildSaleRows(list, activePayFilter){
     const portion=splitPayments.filter(sp=>mapType(sp.type)===activePayFilter).reduce((a,sp)=>a+(sp.amount||0),0);
     return portion>0?portion:grandTotal;
   };
-  const groups={}, singles=[], seen=new Set();
-  list.forEach(s=>{
+  // PERF: single pass bucketing by receiptId instead of re-filtering the whole
+  // list for every row (that was O(n^2) and froze the page on large sale histories).
+  const byReceipt=new Map(), singles=[];
+  for(const s of list){
     if(s.receiptId){
-      if(!seen.has(s.receiptId)){
-        seen.add(s.receiptId);
-        const siblings=list.filter(x=>x.receiptId===s.receiptId);
-        const first=siblings[0];
-        const voided=first.status==='voided';
-        const grandTotal=first.grandTotal||siblings.reduce((a,x)=>a+(x.total||0),0);
-        const splits=first.splitPayments||[];
-        groups[s.receiptId]={
-          key:first.receiptId, products:siblings.map(x=>x.productName).join(', '),
-          qty:siblings.reduce((a,x)=>a+x.quantity,0),
-          total:displayTotal(splits,grandTotal),
-          grandTotal,
-          payment:splits.length>1?'Split: '+splits.map(p=>(p.type||'cash')).join('+'):(first.paymentType||'cash'),
-          splitPayments:splits, customer:first.customer||'',
-          cashier:first.cashier||'—', rawDate:new Date(first.saleDate||first.timestamp),
-          date:fmtDT(first.saleDate||first.timestamp), voided, id:first.id,
-          rcpId:first.receiptId, isGroup:true
-        };
-      }
+      if(!byReceipt.has(s.receiptId)) byReceipt.set(s.receiptId,[]);
+      byReceipt.get(s.receiptId).push(s);
     } else {
-      const splits=s.splitPayments||[];
-      const grandTotal=s.grandTotal||s.total;
-      singles.push({
-        key:s.id, products:s.productName, qty:s.quantity,
-        total:displayTotal(splits,grandTotal),
-        grandTotal,
-        payment:splits.length>1?'Split: '+splits.map(p=>(p.type||'cash')).join('+'):(s.paymentType||'cash'),
-        splitPayments:splits, customer:s.customer||'',
-        cashier:s.cashier||'—', rawDate:new Date(s.saleDate||s.timestamp),
-        date:fmtDT(s.saleDate||s.timestamp), voided:s.status==='voided',
-        id:s.id, rcpId:s.receiptId||null, isGroup:false
-      });
+      singles.push(s);
     }
+  }
+  const groups=[];
+  byReceipt.forEach(siblings=>{
+    const first=siblings[0];
+    const voided=first.status==='voided';
+    const grandTotal=first.grandTotal||siblings.reduce((a,x)=>a+(x.total||0),0);
+    const splits=first.splitPayments||[];
+    groups.push({
+      key:first.receiptId, products:siblings.map(x=>x.productName).join(', '),
+      qty:siblings.reduce((a,x)=>a+x.quantity,0),
+      total:displayTotal(splits,grandTotal),
+      grandTotal,
+      payment:splits.length>1?'Split: '+splits.map(p=>(p.type||'cash')).join('+'):(first.paymentType||'cash'),
+      splitPayments:splits, customer:first.customer||'',
+      cashier:first.cashier||'—', rawDate:new Date(first.saleDate||first.timestamp),
+      date:fmtDT(first.saleDate||first.timestamp), voided, id:first.id,
+      rcpId:first.receiptId, isGroup:true
+    });
   });
-  return [...Object.values(groups),...singles].sort((a,b)=>b.rawDate-a.rawDate);
+  const singleRows=singles.map(s=>{
+    const splits=s.splitPayments||[];
+    const grandTotal=s.grandTotal||s.total;
+    return {
+      key:s.id, products:s.productName, qty:s.quantity,
+      total:displayTotal(splits,grandTotal),
+      grandTotal,
+      payment:splits.length>1?'Split: '+splits.map(p=>(p.type||'cash')).join('+'):(s.paymentType||'cash'),
+      splitPayments:splits, customer:s.customer||'',
+      cashier:s.cashier||'—', rawDate:new Date(s.saleDate||s.timestamp),
+      date:fmtDT(s.saleDate||s.timestamp), voided:s.status==='voided',
+      id:s.id, rcpId:s.receiptId||null, isGroup:false
+    };
+  });
+  return [...groups,...singleRows].sort((a,b)=>b.rawDate-a.rawDate);
 }
 
-function renderSales(){
+// PERF: cap how many rows we build DOM for in one go. Building a huge <table>
+// from thousands of rows in one innerHTML pass is what made the Sales page take
+// forever to open on branches with a large history. "Show more" reveals more
+// already-loaded rows instantly (no extra Firestore reads).
+let SALES_RENDER_LIMIT = 300;
+function loadMoreSalesRows(){ SALES_RENDER_LIMIT += 300; renderSales(true); }
+function renderSales(_keepLimit){
+  if(!_keepLimit) SALES_RENDER_LIMIT = 300;
   const fPay=g('sf-pay')?.value||'';
   const list=getFilteredSales();
   const nonVoided=list.filter(s=>s.status!=='voided'&&!s.voided);
@@ -3337,9 +3461,13 @@ function renderSales(){
 
   const payBadge=p=>{const m=(p||'cash').toLowerCase();if(m.startsWith('split')) return 'bdg-p';return m==='transfer'?'bdg-b':m==='pos'||m==='atm'?'bdg-p':m==='credit'?'bdg-a':'bdg-g';};
 
+  let _remaining=SALES_RENDER_LIMIT, _shown=0;
   cont.innerHTML=Object.entries(byDate).map(([date,dayRows])=>{
     const dayTotal=dayRows.filter(r=>!r.voided).reduce((a,r)=>a+(r.total||0),0);
     const daySales=dayRows.filter(r=>!r.voided).length;
+    if(_remaining<=0) return ''; // cap reached — remaining groups wait for "Show more"
+    const rowsToShow=dayRows.slice(0,_remaining);
+    _remaining-=rowsToShow.length; _shown+=rowsToShow.length;
     return `
     <div style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:linear-gradient(135deg,#0F1F45,#1E3A8A);border-radius:10px 10px 0 0;color:#fff">
@@ -3351,7 +3479,7 @@ function renderSales(){
       </div>
       <div class="card" style="border-radius:0 0 10px 10px;margin-top:0">
         <div class="tw"><table><thead><tr><th>#</th><th>Product(s)</th><th>Qty</th><th>Total</th><th>Payment</th><th>Customer</th><th>Cashier</th><th>Time</th><th>Actions</th></tr></thead>
-        <tbody>${dayRows.map((r,i)=>`<tr style="${r.voided?'opacity:.45;text-decoration:line-through;':''}">
+        <tbody>${rowsToShow.map((r,i)=>`<tr style="${r.voided?'opacity:.45;text-decoration:line-through;':''}">
           <td style="color:var(--t4);font-size:.76rem">${i+1}</td>
           <td class="td-n" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.products)}">${esc(r.products)}</td>
           <td class="td-m">${r.qty}</td>
@@ -3367,7 +3495,7 @@ function renderSales(){
         </tr>`).join('')}</tbody></table>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (rows.length>_shown?`<button class="btn btn-o btn-sm" style="width:100%;margin-top:6px" onclick="loadMoreSalesRows()">⬇️ Show more (${rows.length-_shown} of ${rows.length} remaining)</button>`:'');
 }
 
 // ── VOID / CORRECT SALE ───────────────────────────
