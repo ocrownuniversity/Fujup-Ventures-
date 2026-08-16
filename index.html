@@ -609,6 +609,21 @@ tbody tr:hover{background:var(--bg)}
         <div id="no-cost-list"></div>
       </div>
 
+      <!-- Cost Price Higher Than Selling Price Banner (this is what causes profit to show negative) -->
+      <div id="price-error-banner" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:1.2rem">🚫</span>
+            <div>
+              <div style="font-weight:700;color:#B91C1C;font-size:.88rem">Cost Price Higher Than Selling Price</div>
+              <div style="font-size:.73rem;color:#991B1B" id="price-error-msg">These products are set to sell for less than they cost — this is what's making profit show negative</div>
+            </div>
+          </div>
+          <button onclick="togglePriceErrorList()" id="price-error-toggle" style="background:#FECACA;border:none;border-radius:8px;padding:4px 10px;font-size:.75rem;font-weight:700;color:#991B1B;cursor:pointer">Hide ▲</button>
+        </div>
+        <div id="price-error-list"></div>
+      </div>
+
       <div class="pg-grid" id="prod-grid"></div>
     </div>
 
@@ -3684,6 +3699,7 @@ renderProds=function(){
   }).join('')
   :'<div class="empty" style="grid-column:1/-1"><div class="empty-icon">📦</div><div class="empty-title">No products</div><div class="empty-sub">'+(can('prod')?'Click "+ Add Product" to start':'No products in inventory yet')+'</div></div>';
   renderMissingCostBanner();
+  renderPriceErrorBanner();
 };
 
 function renderMissingCostBanner(){
@@ -3710,6 +3726,32 @@ function toggleNoCostList(){
   btn.textContent=hidden?'Hide ▲':'Show ▼';
 }
 
+// Products where cost price was mistakenly entered higher than selling price —
+// this is exactly what makes profit show as negative. Surfaced clearly on the
+// Products page so it can be found and fixed, and blocked going forward in saveProd().
+function renderPriceErrorBanner(){
+  const banner=g('price-error-banner'); if(!banner) return;
+  const bad=PRODS.filter(p=>(p.costPrice||0)>0 && (p.price||0)>0 && p.costPrice>p.price);
+  if(!bad.length){ banner.style.display='none'; return; }
+  banner.style.display='block';
+  g('price-error-msg').textContent=bad.length+' product'+(bad.length>1?'s have':' has')+' cost price higher than selling price — losing money on every sale until fixed';
+  g('price-error-list').innerHTML=bad.map(p=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid #FECACA">
+      <div>
+        <div style="font-weight:700;font-size:.83rem;color:#1F2937">${esc(p.name)}</div>
+        <div style="font-size:.72rem;color:#991B1B">Cost: ${fmt(p.costPrice)} · Selling: ${fmt(p.price)} · Loss per unit: ${fmt(p.costPrice-p.price)}</div>
+      </div>
+      <button onclick="openProdModal('${p.id}')" style="background:#DC2626;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:.75rem;font-weight:700;cursor:pointer;flex-shrink:0;margin-left:8px">✏️ Fix</button>
+    </div>`).join('');
+}
+function togglePriceErrorList(){
+  const list=g('price-error-list'), btn=g('price-error-toggle');
+  if(!list||!btn) return;
+  const hidden=list.style.display==='none';
+  list.style.display=hidden?'block':'none';
+  btn.textContent=hidden?'Hide ▲':'Show ▼';
+}
+
 // ── UPGRADED saveProd (save expiry + unitsPerPack) ─
 const _origSaveProd=saveProd;
 saveProd=async function(){
@@ -3717,13 +3759,15 @@ saveProd=async function(){
   const effectiveProdBID=BID||ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first from the Branches page','e');return;}
   const name=g('pm-name').value.trim(),cat=g('pm-cat').value.trim();
   const price=parseFloat(g('pm-price').value),qty=parseInt(g('pm-qty').value);
+  const costPrice=parseFloat(g('pm-cost').value)||0;
   const eid=g('pm-id').value;
   if(!name) return ferr('pm-err','Product name required.');
   if(!cat)  return ferr('pm-err','Category required.');
   if(isNaN(price)||price<0) return ferr('pm-err','Enter valid price.');
   if(isNaN(qty)||qty<0)     return ferr('pm-err','Enter valid quantity.');
+  if(costPrice>0 && costPrice>price) return ferr('pm-err','⚠️ Cost price ('+fmt(costPrice)+') cannot be greater than selling price ('+fmt(price)+'). Fix one of them before saving.');
   const data={name,category:cat,price,quantity:qty,
-    sku:g('pm-sku').value.trim(),costPrice:parseFloat(g('pm-cost').value)||0,
+    sku:g('pm-sku').value.trim(),costPrice,
     lowAt:parseInt(g('pm-low').value)||CFG.threshold,
     supplier:g('pm-sup').value.trim(),
     unitsPerPack:parseInt(g('pm-upack')?.value)||0,
