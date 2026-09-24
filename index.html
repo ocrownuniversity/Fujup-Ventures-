@@ -2512,11 +2512,12 @@ function drawChart(cid, days, salesData){
 }
 
 // ── NOTIFICATIONS ──────────────────────────────────
-async function addNotif(type,title,text){
+async function addNotif(type,title,text,skipBadge){
   // Local only — no Firebase write to save quota
-  const n={id:'local-'+Date.now(),type,title,text,time:new Date(),read:false};
+  const n={id:'local-'+Date.now()+'-'+Math.random().toString(36).slice(2),type,title,text,time:new Date(),read:false};
   NOTIFS.unshift(n); NOTIFS=NOTIFS.slice(0,50);
-  updBadges(); return; // skip Firebase write
+  if(!skipBadge) updBadges();
+  return; // skip Firebase write
   // (Firebase write disabled to save quota)
   const notifBID = BID || ME?.buyerId; if(!notifBID)return; const BID_=notifBID;
   try{ await db.collection('buyers').doc(BID_).collection('notifications').add({type,title,text,time:firebase.firestore.FieldValue.serverTimestamp(),read:false,buyerId:BID_}); }catch(e){console.warn('notif:',e);}
@@ -2528,7 +2529,15 @@ function renderNotifs(){
 }
 async function markRead(id){ const b=BID||ME?.buyerId; if(!b)return; try{ await db.collection('buyers').doc(b).collection('notifications').doc(id).update({read:true}); }catch(e){} }
 async function markAllRead(){ const b=BID||ME?.buyerId; if(!b)return; const batch=db.batch(); NOTIFS.filter(n=>!n.read).forEach(n=>batch.update(db.collection('buyers').doc(b).collection('notifications').doc(n.id),{read:true})); try{await batch.commit();toast('All read','s');}catch(e){} }
-function checkLowStock(){ const cb=BID||ME?.buyerId; if(!cb)return; PRODS.filter(p=>p.quantity<=(p.lowAt||CFG.threshold)).forEach(p=>{ const exists=NOTIFS.some(n=>!n.read&&n.text?.includes(p.name)); if(!exists) addNotif('warn','Low Stock',p.name+' is low ('+p.quantity+' units).'); }); }
+function checkLowStock(){
+  const cb=BID||ME?.buyerId; if(!cb)return;
+  let added=false;
+  PRODS.filter(p=>p.quantity<=(p.lowAt||CFG.threshold)).forEach(p=>{
+    const exists=NOTIFS.some(n=>!n.read&&n.text?.includes(p.name));
+    if(!exists){ addNotif('warn','Low Stock',p.name+' is low ('+p.quantity+' units).',true); added=true; }
+  });
+  if(added) updBadges(); // update badge once for the whole batch, not once per product
+}
 function updBadges(){ const u=NOTIFS.filter(n=>!n.read).length; const ts=SALES.filter(s=>new Date(s.timestamp).toDateString()===new Date().toDateString()&&s.status!=='voided'&&!s.voided).length; g('sb-notif').textContent=u||''; g('sb-sales').textContent=ts||''; u>0?g('tb-ndot').classList.remove('h'):g('tb-ndot').classList.add('h'); }
 
 // ── STAFF ──────────────────────────────────────────
@@ -3683,18 +3692,20 @@ function getExpiryBadge(expDate){
 }
 
 function checkExpiryAlerts(){
+  let added=false;
   PRODS.forEach(p=>{
     if(!p.expiryDate) return;
     const d=new Date(p.expiryDate), now=new Date();
     const days=Math.floor((d-now)/(1000*60*60*24));
     if(days<0){
       const exists=NOTIFS.some(n=>!n.read&&n.title==='Product Expired'&&n.text.includes(p.name));
-      if(!exists) addNotif('warn','Product Expired',p.name+' has expired! Please remove from inventory.');
+      if(!exists){ addNotif('warn','Product Expired',p.name+' has expired! Please remove from inventory.',true); added=true; }
     } else if(days<=30){
       const exists=NOTIFS.some(n=>!n.read&&n.title==='Expiry Alert'&&n.text.includes(p.name));
-      if(!exists) addNotif('warn','Expiry Alert',p.name+' expires in '+days+' days.');
+      if(!exists){ addNotif('warn','Expiry Alert',p.name+' expires in '+days+' days.',true); added=true; }
     }
   });
+  if(added) updBadges(); // update badge once for the whole batch, not once per product
 }
 
 // ── UPGRADED renderProds ──────────────────────────
