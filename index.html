@@ -3710,7 +3710,15 @@ function checkExpiryAlerts(){
 
 // ── UPGRADED renderProds ──────────────────────────
 const _origRenderProds=renderProds;
-renderProds=function(){
+// PERF: cap how many product cards get built into the DOM at once — building
+// hundreds of rich cards in one innerHTML pass is real, felt work on a phone,
+// and this function re-runs on every search/filter keystroke AND after every
+// single product save. "Show more" reveals more already-loaded products
+// instantly (no extra Firestore reads).
+let PRODS_RENDER_LIMIT=60;
+function loadMoreProds(){ PRODS_RENDER_LIMIT+=60; renderProds(true); }
+renderProds=function(_keepLimit){
+  if(!_keepLimit) PRODS_RENDER_LIMIT=60;
   const q=(g('ps')?.value||'').toLowerCase();
   const cat=g('pc')?.value||'';
   const srt=g('psort')?.value||'name';
@@ -3762,7 +3770,8 @@ renderProds=function(){
   const cf=g('pc'); if(cf){const cv=cf.value;cf.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option value="${esc(c)}"${c===cv?' selected':''}>${esc(c)}</option>`).join('');}
   const dl=g('cat-dl'); if(dl) dl.innerHTML=cats.map(c=>`<option value="${esc(c)}">`).join('');
   const con=g('prod-grid');
-  con.innerHTML=list.length?list.map(p=>{
+  const shown=list.slice(0,PRODS_RENDER_LIMIT);
+  con.innerHTML=shown.length?shown.map(p=>{
     const lw=p.quantity>0&&p.quantity<=(p.lowAt||CFG.threshold);
     const ot=p.quantity===0;
     const em=EMOJI[p.category]||'📦';
@@ -3783,7 +3792,7 @@ renderProds=function(){
         </div>
       </div>
     </div>`;
-  }).join('')
+  }).join('')+(list.length>shown.length?`<div style="grid-column:1/-1"><button class="btn btn-o btn-sm" style="width:100%;margin-top:6px" onclick="loadMoreProds()">⬇️ Show more (${list.length-shown.length} of ${list.length} remaining)</button></div>`:'')
   :'<div class="empty" style="grid-column:1/-1"><div class="empty-icon">📦</div><div class="empty-title">No products</div><div class="empty-sub">'+(can('prod')?'Click "+ Add Product" to start':'No products in inventory yet')+'</div></div>';
   renderMissingCostBanner();
   renderPriceErrorBanner();
@@ -3862,10 +3871,20 @@ saveProd=async function(){
     buyerId:effectiveProdBID};
   try{
     const col=db.collection('buyers').doc(effectiveProdBID).collection('products');
-    if(eid){ await col.doc(eid).update(data); }
-    else{ await col.add({...data,dateAdded:firebase.firestore.FieldValue.serverTimestamp()}); addNotif('info','Product Added',name+' added to inventory.'); }
+    if(eid){
+      await col.doc(eid).update(data);
+      // PERF/UX: patch it locally — no need to re-fetch the whole product list just to see the edit
+      const idx=PRODS.findIndex(p=>p.id===eid);
+      if(idx>=0) PRODS[idx]={...PRODS[idx],...data};
+    } else {
+      const ref=await col.add({...data,dateAdded:firebase.firestore.FieldValue.serverTimestamp()});
+      // PERF/UX: add it straight into memory — avoids ever needing a full reload to see it
+      PRODS.unshift({id:ref.id,...data,dateAdded:new Date().toISOString()});
+      addNotif('info','Product Added',name+' added to inventory.');
+    }
     closeM('prod-modal'); toast(eid?'✅ Product updated!':'✅ Product added to inventory!','s');
     checkLowStock(); checkExpiryAlerts();
+    if(g('pg-products')?.classList.contains('on')) renderProds();
   }catch(e){ferr('pm-err','Save failed: '+e.message);}
 };
 
