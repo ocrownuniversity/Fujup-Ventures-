@@ -3851,17 +3851,22 @@ function togglePriceErrorList(){
 // ── UPGRADED saveProd (save expiry + unitsPerPack) ─
 const _origSaveProd=saveProd;
 saveProd=async function(){
-  if(!can('prod')){toast('⛔ No permission to edit products','e');return;}
-  const effectiveProdBID=BID||ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first from the Branches page','e');return;}
+  const eid=g('pm-id').value;
+  const btn=g('pm-save');
+  // Show "Saving..." the instant Save is tapped — pure UI feedback, nothing about
+  // how the data is validated or saved changes. Also prevents double-tap duplicates.
+  if(btn){ btn.disabled=true; btn.dataset.origLabel=btn.textContent; btn.textContent='⏳ Saving...'; }
+  function resetBtn(){ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.origLabel||(eid?'Save Changes':'Add Product'); btn.onclick=()=>{btn.onclick=null;saveProd();}; } }
+  if(!can('prod')){toast('⛔ No permission to edit products','e');resetBtn();return;}
+  const effectiveProdBID=BID||ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first from the Branches page','e');resetBtn();return;}
   const name=g('pm-name').value.trim(),cat=g('pm-cat').value.trim();
   const price=parseFloat(g('pm-price').value),qty=parseInt(g('pm-qty').value);
   const costPrice=parseFloat(g('pm-cost').value)||0;
-  const eid=g('pm-id').value;
-  if(!name) return ferr('pm-err','Product name required.');
-  if(!cat)  return ferr('pm-err','Category required.');
-  if(isNaN(price)||price<0) return ferr('pm-err','Enter valid price.');
-  if(isNaN(qty)||qty<0)     return ferr('pm-err','Enter valid quantity.');
-  if(costPrice>0 && costPrice>price) return ferr('pm-err','⚠️ Cost price ('+fmt(costPrice)+') cannot be greater than selling price ('+fmt(price)+'). Fix one of them before saving.');
+  if(!name) { resetBtn(); return ferr('pm-err','Product name required.'); }
+  if(!cat)  { resetBtn(); return ferr('pm-err','Category required.'); }
+  if(isNaN(price)||price<0) { resetBtn(); return ferr('pm-err','Enter valid price.'); }
+  if(isNaN(qty)||qty<0)     { resetBtn(); return ferr('pm-err','Enter valid quantity.'); }
+  if(costPrice>0 && costPrice>price) { resetBtn(); return ferr('pm-err','⚠️ Cost price ('+fmt(costPrice)+') cannot be greater than selling price ('+fmt(price)+'). Fix one of them before saving.'); }
   const data={name,category:cat,price,quantity:qty,
     sku:g('pm-sku').value.trim(),costPrice,
     lowAt:parseInt(g('pm-low').value)||CFG.threshold,
@@ -3885,7 +3890,8 @@ saveProd=async function(){
     closeM('prod-modal'); toast(eid?'✅ Product updated!':'✅ Product added to inventory!','s');
     checkLowStock(); checkExpiryAlerts();
     if(g('pg-products')?.classList.contains('on')) renderProds();
-  }catch(e){ferr('pm-err','Save failed: '+e.message);}
+    resetBtn();
+  }catch(e){ resetBtn(); ferr('pm-err','Save failed: '+e.message); }
 };
 
 // ── UPGRADED openProdModal (populate expiry + unitsPerPack) ──
