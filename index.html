@@ -3249,11 +3249,29 @@ function resetSplitRows(){
 }
 
 // ── UPGRADED saveSale ─────────────────────────────
+let SALE_SUBMIT_LOCK=false; // true while a sale is actually being written to Firebase
 async function saveSale(){
-  if(!can('sale')){toast('⛔ No permission','e');return;}
+  // ── Hard submission lock ──────────────────────────────
+  // A duplicate-after-the-fact check (further below) isn't enough on its own:
+  // during a network hang, a first attempt can still be silently in flight when
+  // the user gives up and taps again — at that point there's no completed sale
+  // for the duplicate check to compare against yet, so it can't catch it. This
+  // lock makes a second submission impossible for as long as the first one is
+  // still pending, no matter how long that takes or how many times it's tapped.
+  const smBtn=g('sm-save');
+  if(SALE_SUBMIT_LOCK){
+    toast('⏳ A sale is still being recorded — please wait for it to finish before trying again.','w');
+    return;
+  }
+  if(smBtn && smBtn.dataset.origHtml===undefined) smBtn.dataset.origHtml=smBtn.innerHTML;
+  function lockSaleBtn(){ SALE_SUBMIT_LOCK=true; if(smBtn){ smBtn.disabled=true; smBtn.innerHTML='⏳ Recording sale...'; } }
+  function unlockSaleBtn(){ SALE_SUBMIT_LOCK=false; if(smBtn){ smBtn.disabled=false; smBtn.innerHTML=smBtn.dataset.origHtml; } }
+  lockSaleBtn();
+
+  if(!can('sale')){toast('⛔ No permission','e');unlockSaleBtn();return;}
   const activeBID=BID||ME?.buyerId;
-  if(!activeBID){ferr('sm-err','No buyer context. Please logout and log back in.');return;}
-  if(CART.length===0){ferr('sm-err','Cart is empty — add at least one product.');return;}
+  if(!activeBID){ferr('sm-err','No buyer context. Please logout and log back in.');unlockSaleBtn();return;}
+  if(CART.length===0){ferr('sm-err','Cart is empty — add at least one product.');unlockSaleBtn();return;}
 
   const cust=g('sm-cust').value.trim();
   const saleDate=g('sm-date')?.value?new Date(g('sm-date').value):new Date();
@@ -3269,10 +3287,11 @@ async function saveSale(){
 
   // Get split payments
   const splitPayments=getSplitPayments();
-  if(splitPayments.length===0){ferr('sm-err','Enter at least one payment amount.');return;}
+  if(splitPayments.length===0){ferr('sm-err','Enter at least one payment amount.');unlockSaleBtn();return;}
   const totalPaid=Math.round(splitPayments.reduce((a,p)=>a+p.amount,0)*100)/100;
   if(totalPaid<grandTotal-0.01){
     ferr('sm-err','Amount entered ('+fmt(totalPaid)+') is less than total ('+fmt(grandTotal)+'). Please complete payment.');
+    unlockSaleBtn();
     return;
   }
   const primaryPayment=splitPayments[0].type;
@@ -3308,7 +3327,7 @@ async function saveSale(){
     const mins=Math.max(0,Math.round((Date.now()-dupMatchTime)/60000));
     const when=mins<1?'less than a minute ago':(mins+' minute'+(mins>1?'s':'')+' ago');
     const proceed=confirm('⚠️ Possible duplicate sale\n\nA sale with these exact items and a total of '+fmt(grandTotal)+' was already recorded '+when+'. This can happen if a previous attempt actually went through during a network hang.\n\nPress OK to record this as a NEW sale anyway, or Cancel to stop.');
-    if(!proceed) return;
+    if(!proceed){ unlockSaleBtn(); return; }
   }
 
   try{
@@ -3316,8 +3335,8 @@ async function saveSale(){
     const saleItems=[];
     for(const item of CART){
       const prod=PRODS.find(p=>p.id===item.productId);
-      if(!prod){ferr('sm-err','Product "'+item.name+'" not found.');return;}
-      if(item.qty>prod.quantity){ferr('sm-err','Not enough stock for "'+item.name+'". Only '+prod.quantity+' available.');return;}
+      if(!prod){ferr('sm-err','Product "'+item.name+'" not found.');unlockSaleBtn();return;}
+      if(item.qty>prod.quantity){ferr('sm-err','Not enough stock for "'+item.name+'". Only '+prod.quantity+' available.');unlockSaleBtn();return;}
       const itemShare=subtotal>0?(item.subtotal/subtotal):1/CART.length;
       const itemDisc=Math.round(billDiscAmt*itemShare*100)/100;
       const saleRef=db.collection('buyers').doc(activeBID).collection('sales').doc();
@@ -3407,7 +3426,9 @@ async function saveSale(){
     if(cur==='dashboard') renderDash();
     setTimeout(()=>showCartReceipt(saleItems,cust,grandTotal,receiptId,cashierName,saleDate,splitPayments,billDiscAmt),400);
     CART=[];
+    unlockSaleBtn();
   }catch(e){
+    unlockSaleBtn();
     const msg=e.message||'';
     if(msg.includes('Quota')||msg.includes('quota')||msg.includes('resource-exhausted')||msg.includes('Failed to get')){
       // ── OFFLINE SALES TEMPORARILY DISABLED (client request) ──
