@@ -913,7 +913,7 @@ tbody tr:hover{background:var(--bg)}
       <div class="fg2"><label class="fl">SKU / Code</label><input class="fc" id="pm-sku" placeholder="MED-001"/></div>
       <div class="fg2"><label class="fl">Selling Price *</label><input class="fc" type="number" id="pm-price" placeholder="0.00" min="0" step="0.01"/></div>
       <div class="fg2"><label class="fl">Cost Price</label><input class="fc" type="number" id="pm-cost" placeholder="0.00" min="0" step="0.01"/></div>
-      <div class="fg2"><label class="fl">Quantity *</label><input class="fc" type="number" id="pm-qty" placeholder="0" min="0"/></div>
+      <div class="fg2"><label class="fl">Quantity *</label><input class="fc" type="number" id="pm-qty" placeholder="0" min="0" step="0.01"/></div>
       <div class="fg2"><label class="fl">Low Stock Alert At</label><input class="fc" type="number" id="pm-low" placeholder="10"/></div>
       <div class="fu fg2"><label class="fl">Supplier</label><input class="fc" id="pm-sup" placeholder="Supplier name"/></div>
       <div class="fg2"><label class="fl">Units per Pack/Crate</label><input class="fc" type="number" id="pm-upack" placeholder="e.g. 12 (for half-pack/crate)" min="1"/></div>
@@ -3881,7 +3881,7 @@ saveProd=async function(){
   if(!can('prod')){toast('⛔ No permission to edit products','e');resetBtn();return;}
   const effectiveProdBID=BID||ME?.buyerId; if(!effectiveProdBID){toast('Enter a branch first from the Branches page','e');resetBtn();return;}
   const name=g('pm-name').value.trim(),cat=g('pm-cat').value.trim();
-  const price=parseFloat(g('pm-price').value),qty=parseInt(g('pm-qty').value);
+  const price=parseFloat(g('pm-price').value),qty=parseFloat(g('pm-qty').value);
   const costPrice=parseFloat(g('pm-cost').value)||0;
   if(!name) { resetBtn(); return ferr('pm-err','Product name required.'); }
   if(!cat)  { resetBtn(); return ferr('pm-err','Category required.'); }
